@@ -25,7 +25,7 @@
     railMarkColor: 'green',// 时间轴今日日程标点颜色：green | yellow
     railNowStyle: 'bar',   // 当前时间指示样式：bar 横杠 | dot 圆点
     navGlass: true,        // 侧边导航毛玻璃：true 开启 | false 关闭
-    updateUrl: ''          // 更新源：指向 latest.json 版本清单的 URL，留空则检查更新不可用
+    updateUrl: 'https://brm-yidu.github.io/YDSchedule/updates/latest.json'  // 更新源：指向 latest.json 版本清单的 URL，留空则检查更新不可用
   };
 
   const DEFAULT_PLUGINS = {
