@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YDSchedule · 极简日程表 - 下载中心</title>
+<meta name="description" content="极简日程表 YDSchedule：四端可用的个人时间管理工具。Windows 桌面版 / Web 在线版 / 移动端 PWA，数据全部保存在本地。">
+<link rel="icon" href="ydschedule-web/icons/icon-192.png">
+<style>
+  :root {
+    --paper: #F3F0E9;
+    --paper-2: #ECE7DC;
+    --ink: #2B2B2B;
+    --ink-soft: #6B675F;
+    --accent: #C9A227;
+    --accent-dark: #A8861D;
+    --green: #4A7C59;
+    --card: #FFFFFF;
+    --shadow: 0 10px 30px rgba(43,43,43,.08);
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ---------- 导航 ---------- */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(243,240,233,.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(43,43,43,.06);
+  }
+  .nav {
+    max-width: 1080px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .brand img { width: 32px; height: 32px; border-radius: 8px; }
+  .nav-links { display: flex; gap: 26px; font-size: 14px; color: var(--ink-soft); }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-cta {
+    background: var(--ink); color: #fff; padding: 8px 18px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; transition: transform .15s, box-shadow .15s;
+  }
+  .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(43,43,43,.2); }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    max-width: 1080px; margin: 0 auto; padding: 72px 24px 48px;
+    text-align: center;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--paper-2); border: 1px solid rgba(43,43,43,.08);
+    padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--ink-soft);
+    margin-bottom: 24px;
+  }
+  .hero-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .hero h1 { font-size: clamp(34px, 6vw, 56px); font-weight: 800; letter-spacing: -1px; line-height: 1.15; }
+  .hero h1 .accent { color: var(--accent-dark); }
+  .hero .sub { max-width: 620px; margin: 18px auto 0; font-size: 17px; color: var(--ink-soft); }
+  .hero-actions { margin-top: 36px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 30px; border-radius: 14px; font-size: 16px; font-weight: 700;
+    transition: transform .15s, box-shadow .15s; cursor: pointer; border: none;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary { background: var(--ink); color: #fff; box-shadow: 0 8px 24px rgba(43,43,43,.25); }
+  .btn-primary:hover { box-shadow: 0 12px 28px rgba(43,43,43,.3); }
+  .btn-accent { background: var(--accent); color: #fff; box-shadow: 0 8px 24px rgba(201,162,39,.35); }
+  .btn-accent:hover { box-shadow: 0 12px 28px rgba(201,162,39,.42); }
+  .btn-ghost { background: var(--card); color: var(--ink); border: 1px solid rgba(43,43,43,.12); }
+  .btn .ico { font-size: 20px; }
+  .btn small { display: block; font-size: 11px; font-weight: 500; opacity: .75; }
+
+  /* ---------- 平台卡片 ---------- */
+  .platforms {
+    max-width: 1080px; margin: 0 auto; padding: 24px 24px 8px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  }
+  .pcard {
+    background: var(--card); border-radius: var(--radius); padding: 28px;
+    box-shadow: var(--shadow); border: 1px solid rgba(43,43,43,.05);
+    display: flex; flex-direction: column; gap: 14px;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .pcard:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(43,43,43,.12); }
+  .pcard .pico { font-size: 34px; }
+  .pcard h3 { font-size: 19px; font-weight: 700; }
+  .pcard p { font-size: 14px; color: var(--ink-soft); flex: 1; }
+  .pcard .tag {
+    align-self: flex-start; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    background: var(--paper-2); color: var(--ink-soft); font-weight: 600;
+  }
+  .pcard .tag.hot { background: rgba(201,162,39,.15); color: var(--accent-dark); }
+  .pcard .pbtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 18px; border-radius: 12px; font-size: 15px; font-weight: 700;
+    background: var(--ink); color: #fff; transition: transform .15s, box-shadow .15s;
+  }
+  .pcard .pbtn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(43,43,43,.2); }
+  .pcard .pbtn.alt { background: var(--paper-2); color: var(--ink); }
+  .pcard .meta { font-size: 12px; color: var(--ink-soft); }
+
+  /* ---------- 通用区块 ---------- */
+  .section { max-width: 1080px; margin: 0 auto; padding: 56px 24px; }
+  .section h2 { font-size: 28px; font-weight: 800; letter-spacing: -.5px; text-align: center; margin-bottom: 8px; }
+  .section .lead { text-align: center; color: var(--ink-soft); font-size: 15px; margin-bottom: 36px; }
+
+  /* ---------- 特性 ---------- */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .feat {
+    background: var(--card); border-radius: var(--radius); padding: 24px;
+    border: 1px solid rgba(43,43,43,.05); box-shadow: var(--shadow);
+  }
+  .feat .fico { font-size: 26px; margin-bottom: 10px; }
+  .feat h4 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .feat p { font-size: 13.5px; color: var(--ink-soft); }
+
+  /* ---------- 移动端安装指引 ---------- */
+  .mobile-guide {
+    background: var(--ink); color: #EDEAE2; border-radius: 24px; padding: 44px 40px;
+  }
+  .mobile-guide h2 { color: #fff; }
+  .mobile-guide .lead { color: rgba(237,234,226,.7); }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 8px; }
+  .step { background: rgba(255,255,255,.06); border-radius: 14px; padding: 22px; }
+  .step .num {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; margin-bottom: 12px;
+  }
+  .step h4 { font-size: 15px; margin-bottom: 6px; }
+  .step p { font-size: 13px; color: rgba(237,234,226,.75); }
+  .step code { background: rgba(255,255,255,.12); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
+
+  /* ---------- 更新日志 ---------- */
+  .changelog { display: flex; flex-direction: column; gap: 14px; }
+  .cl-item {
+    background: var(--card); border-radius: 14px; padding: 20px 24px;
+    border: 1px solid rgba(43,43,43,.05); box-shadow: var(--shadow);
+    display: flex; gap: 18px; align-items: flex-start;
+  }
+  .cl-ver {
+    flex-shrink: 0; background: var(--ink); color: #fff; font-weight: 800;
+    padding: 6px 14px; border-radius: 10px; font-size: 14px; white-space: nowrap;
+  }
+  .cl-ver.new { background: var(--accent); }
+  .cl-item ul { margin-left: 18px; font-size: 14px; color: var(--ink-soft); }
+  .cl-item li { margin: 3px 0; }
+
+  /* ---------- FAQ ---------- */
+  .faq { display: flex; flex-direction: column; gap: 12px; max-width: 760px; margin: 0 auto; }
+  details {
+    background: var(--card); border-radius: 14px; padding: 18px 22px;
+    border: 1px solid rgba(43,43,43,.05); box-shadow: var(--shadow);
+  }
+  details summary { font-weight: 700; font-size: 15px; cursor: pointer; }
+  details p { font-size: 14px; color: var(--ink-soft); margin-top: 10px; }
+
+  /* ---------- 页脚 ---------- */
+  footer {
+    border-top: 1px solid rgba(43,43,43,.08); padding: 36px 24px;
+    text-align: center; color: var(--ink-soft); font-size: 13px;
+  }
+  footer .links { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; }
+  footer a:hover { color: var(--ink); }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 860px) {
+    .platforms, .features, .steps { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+    .hero { padding-top: 48px; }
+    .cl-item { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <a class="brand" href="./">
+      <img src="ydschedule-web/icons/icon-192.png" alt="YDSchedule">
+      YDSchedule
+    </a>
+    <nav class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#download">下载</a>
+      <a href="#mobile">移动端</a>
+      <a href="#changelog">更新日志</a>
+      <a href="#faq">常见问题</a>
+    </nav>
+    <a class="nav-cta" href="ydschedule-web/">立即使用</a>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge"><span class="dot"></span> 最新版本 v0.14 · 已发布</div>
+  <h1>极简日程表 <span class="accent">YDSchedule</span></h1>
+  <p class="sub">极度专注、高自由度的个人时间管理工具。自然语言一句话添加日程，数据全部保存在本地，无需注册账号。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/BRM-yidu/YDSchedule/releases/download/v0.14.0/YDSchedule-0.14.0-setup.exe">
+      <span class="ico">⬇</span>
+      <span>下载 Windows 桌面版<small>YDSchedule-0.14.0-setup.exe · 约 75 MB</small></span>
+    </a>
+    <a class="btn btn-accent" href="ydschedule-web/">
+      <span class="ico">▶</span>
+      <span>打开 Web 版<small>浏览器即用，无需安装</small></span>
+    </a>
+    <a class="btn btn-ghost" href="#mobile">
+      <span class="ico">📱</span>
+      <span>移动端安装<small>添加到主屏幕</small></span>
+    </a>
+  </div>
+</section>
+
+<!-- 平台卡片 -->
+<section class="platforms" id="download">
+  <div class="pcard">
+    <div class="pico">🖥️</div>
+    <h3>Windows 桌面版</h3>
+    <span class="tag hot">推荐 · 支持自动更新</span>
+    <p>独立安装程序，安装后桌面图标一键启动。应用内「检查更新」可自动升级到新版本。</p>
+    <a class="pbtn" href="https://github.com/BRM-yidu/YDSchedule/releases/download/v0.14.0/YDSchedule-0.14.0-setup.exe">⬇ 下载安装包</a>
+    <div class="meta">v0.14.0 · Windows 7+ / 10 / 11 · 64 位</div>
+  </div>
+  <div class="pcard">
+    <div class="pico">🌐</div>
+    <h3>Web 在线版</h3>
+    <span class="tag">免安装 · 跨平台</span>
+    <p>打开浏览器即可使用，支持桌面与移动端。数据保存在本机浏览器，可导出备份。</p>
+    <a class="pbtn alt" href="ydschedule-web/">打开 Web 版</a>
+    <div class="meta">任何现代浏览器 · Chrome / Edge / Safari</div>
+  </div>
+  <div class="pcard">
+    <div class="pico">📱</div>
+    <h3>移动端 App</h3>
+    <span class="tag">PWA · 添加到主屏幕</span>
+    <p>手机浏览器打开 Web 版，一键「添加到主屏幕」，即可像原生 App 一样全屏使用。</p>
+    <a class="pbtn alt" href="#mobile">查看安装指引</a>
+    <div class="meta">Android / iOS 均支持</div>
+  </div>
+</section>
+
+<!-- 特性 -->
+<section class="section" id="features">
+  <h2>为什么选择 YDSchedule</h2>
+  <p class="lead">极简到极致，专注到每一分钟</p>
+  <div class="features">
+    <div class="feat">
+      <div class="fico">🗣️</div>
+      <h4>自然语言添加</h4>
+      <p>输入「一小时后去晾衣服」「明天早上八点吃药」，自动解析时间并创建日程，无需手动选时间。</p>
+    </div>
+    <div class="feat">
+      <div class="fico">🔒</div>
+      <h4>数据本地保存</h4>
+      <p>所有日程数据保存在本机，无需注册账号，数据不出设备，隐私安全。</p>
+    </div>
+    <div class="feat">
+      <div class="fico">📅</div>
+      <h4>今日 / 周 / 月视图</h4>
+      <p>今日时间轴、周视图、月视图自由切换，今日日程在时间轴上有彩色标点提醒。</p>
+    </div>
+    <div class="feat">
+      <div class="fico">🧩</div>
+      <h4>插件系统</h4>
+      <p>可扩展标签、样式、导航与视图。支持导入自定义插件，预设插件一键启用。</p>
+    </div>
+    <div class="feat">
+      <div class="fico">🎨</div>
+      <h4>高自由度定制</h4>
+      <p>主题、字号、背景、时间轴标点样式、导航毛玻璃等均可按喜好调整。</p>
+    </div>
+    <div class="feat">
+      <div class="fico">☁️</div>
+      <h4>可选云端解析</h4>
+      <p>默认本地语义解析；如需更强能力，可自备 API 密钥开启云端模式。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 移动端安装指引 -->
+<section class="section" id="mobile">
+  <div class="mobile-guide">
+    <h2>移动端安装指引</h2>
+    <p class="lead">手机浏览器打开 Web 版，两步即可像原生 App 一样使用</p>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h4>打开 Web 版</h4>
+        <p>在手机浏览器（Chrome / Safari / Edge）访问 <code>brm-yidu.github.io/YDSchedule/ydschedule-web/</code></p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h4>添加到主屏幕</h4>
+        <p>Android：浏览器菜单 →「添加到主屏幕」；iOS：分享按钮 →「添加到主屏幕」</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h4>像 App 一样使用</h4>
+        <p>主屏幕出现 YDSchedule 图标，点击即可全屏打开，支持离线使用与自动更新。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 更新日志 -->
+<section class="section" id="changelog">
+  <h2>更新日志</h2>
+  <p class="lead">持续迭代，越来越好用</p>
+  <div class="changelog">
+    <div class="cl-item">
+      <div class="cl-ver new">v0.14</div>
+      <div>
+        <ul>
+          <li>新增云端模式：填写 API 密钥后自动隐藏并本地安全存储，开启云端模式才调用云端解析</li>
+          <li>插件管理：预设插件支持删除与恢复，自定义插件管理更灵活</li>
+          <li>设置页优化：新增「语义解析」分类，界面更有序</li>
+          <li>数据导出：格式选择改为下拉选单，支持 CSV / Excel / Word / JSON / iCal / PDF</li>
+          <li>侧边导航毛玻璃设计，可映出背景图片（可在设置中开关）</li>
+          <li>新增检查更新机制，可从更新源自动升级</li>
+        </ul>
+      </div>
+    </div>
+    <div class="cl-item">
+      <div class="cl-ver">v0.13</div>
+      <div>
+        <ul>
+          <li>今日日程时间轴标点提醒（绿色 / 黄色可切换）</li>
+          <li>当前时间指示改为红色横杠 / 圆点（可自定义）</li>
+          <li>设置中背景图片支持纯色与恢复默认</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section" id="faq">
+  <h2>常见问题</h2>
+  <p class="lead">你可能想知道的</p>
+  <div class="faq">
+    <details>
+      <summary>桌面版如何更新到新版本？</summary>
+      <p>打开应用 → 设置 → 程序信息 →「检查更新」。应用会自动从更新源获取最新版本，发现新版本后点击下载即可。也可直接到本页重新下载最新安装包覆盖安装，数据不会丢失。</p>
+    </details>
+    <details>
+      <summary>换电脑 / 换浏览器后数据还在吗？</summary>
+      <p>数据保存在本机（桌面版在本机存储，Web 版在浏览器本地）。如需迁移，请在「数据管理」中导出备份文件，再到新设备导入。</p>
+    </details>
+    <details>
+      <summary>Web 版和桌面版数据互通吗？</summary>
+      <p>目前各端数据独立保存在本地。可通过「数据导出 / 导入」功能在端与端之间迁移数据。</p>
+    </details>
+    <details>
+      <summary>移动端没有 App Store 版本吗？</summary>
+      <p>当前移动端通过 PWA 方式安装（添加到主屏幕），体验与原生 App 一致，且无需经过应用商店审核。后续视需求可发布原生应用。</p>
+    </details>
+  </div>
+</section>
+
+<footer>
+  <div class="links">
+    <a href="https://github.com/BRM-yidu/YDSchedule" target="_blank" rel="noopener">GitHub 开源仓库</a>
+    <a href="https://github.com/BRM-yidu/YDSchedule/releases" target="_blank" rel="noopener">Releases 发布页</a>
+    <a href="ydschedule-web/">打开 Web 版</a>
+  </div>
+  <div>© 2026 YDSchedule · 极简日程表 · MIT License</div>
+</footer>
+
+</body>
+</html>
