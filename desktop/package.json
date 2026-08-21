@@ -1,0 +1,29 @@
+{
+  "name": "ydschedule-desktop",
+  "version": "0.14.0",
+  "description": "极简日程表 YDSchedule 桌面端（Windows / macOS）",
+  "main": "main.js",
+  "author": "YDSchedule",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.7.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ydschedule.app",
+    "productName": "YDSchedule",
+    "files": ["main.js"],
+    "extraResources": [
+      { "from": "../ydschedule-web", "to": "ydschedule-web" }
+    ],
+    "directories": { "output": "release", "buildResources": "build" },
+    "electronDist": "node_modules/electron/dist",
+    "win": { "target": "nsis", "icon": "build/icon.png", "artifactName": "YDSchedule-${version}-setup.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "mac": { "target": "dmg", "icon": "build/icon.png", "category": "public.app-category.productivity" }
+  }
+}
