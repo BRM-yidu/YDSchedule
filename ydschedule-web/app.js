@@ -20,12 +20,61 @@
     init() {
       Store.load();
       this.applySettings();
+      this.applyLang();
       this.applyPlugins();
       this.renderRail();
       this.bindShell();
       this.renderNav();
       this.switchView('home');
       setInterval(() => this.updateRailNow(), 60000);
+      if (!Store.settings.onboarded) this.showOnboarding();
+    },
+
+    /* ---------- 多语言 ---------- */
+    t(key, vars) {
+      const dict = (L10N && L10N[Store.settings.lang]) || L10N['zh-CN'] || {};
+      let s = dict[key];
+      if (s === undefined) s = (L10N['zh-CN'] && L10N['zh-CN'][key]) || key;
+      if (vars) {
+        Object.keys(vars).forEach(k => {
+          s = String(s).replace(new RegExp('\\{' + k + '\\}', 'g'), String(vars[k]));
+        });
+      }
+      return s;
+    },
+
+    applyLang() {
+      const lang = Store.settings.lang || 'zh-CN';
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+      document.body.classList.toggle('rtl', lang === 'ar');
+      document.title = this.t('info.appName') + ' · ' + this.t('info.appEn');
+      /* 静态 HTML 文本（导航、设置、快捷面板） */
+      $$('[data-i18n]').forEach(el => { el.textContent = this.t(el.dataset.i18n); });
+      const sBtn = $('#settingsBtn');
+      if (sBtn) sBtn.setAttribute('aria-label', this.t('settings.title'));
+      const sClose = $('#settingsClose');
+      if (sClose) sClose.setAttribute('aria-label', this.t('settings.close'));
+      const qClose = $('#quickClose');
+      if (qClose) qClose.setAttribute('aria-label', this.t('settings.close'));
+      const qTitle = $('#quickTitle');
+      if (qTitle) qTitle.placeholder = this.t('quick.titlePh');
+      const rail = $('#navRail');
+      if (rail) rail.setAttribute('aria-label', this.t('nav.railAria'));
+      const panel = $('#navPanel');
+      if (panel) panel.setAttribute('aria-label', this.t('nav.panelAria'));
+      const qMask = $('#quickMask');
+      if (qMask) qMask.setAttribute('aria-label', this.t('quick.title'));
+      const sPanel = $('#settingsPanel');
+      if (sPanel) sPanel.setAttribute('aria-label', this.t('settings.title'));
+      const qPanel = $('#quickPanel');
+      if (qPanel) qPanel.setAttribute('aria-label', this.t('quick.title'));
+    },
+
+    /* 本地化日期：{y}/{m}/{d} 按当前语言格式输出 */
+    fmtDate(d) {
+      const y = d.getFullYear(), m = d.getMonth() + 1, dd = d.getDate();
+      return this.t('date.full', { y, m, d: dd });
     },
 
     applySettings() {
@@ -42,6 +91,11 @@
       root.setProperty('--rail-mark-color', s.railMarkColor === 'yellow' ? '#E0B400' : '#3BA55D');
       document.body.classList.toggle('rail-now-dot', s.railNowStyle === 'dot');
       document.body.classList.toggle('nav-glass', s.navGlass !== false);
+      /* 首页输入框大小：sm | md | lg */
+      const inp = { sm: { pad: '10px 16px', fs: '14px' }, md: { pad: '14px 20px', fs: '16px' }, lg: { pad: '18px 24px', fs: '19px' } };
+      const i = inp[s.inputSize] || inp.md;
+      root.setProperty('--home-input-pad', i.pad);
+      root.setProperty('--home-input-fs', i.fs);
       document.body.style.backgroundImage = '';
       document.body.style.backgroundColor = '';
       if (s.bgType === 'color') {
@@ -161,6 +215,60 @@
     openNav() { document.body.classList.add('nav-open'); },
     closeNav() { document.body.classList.remove('nav-open'); },
 
+    /* ---------- 首次使用指引（可跳过） ---------- */
+    showOnboarding() {
+      const steps = [
+        { icon: '⌨', title: this.t('ob.step1Title'), desc: this.t('ob.step1Desc') },
+        { icon: '☰', title: this.t('ob.step2Title'), desc: this.t('ob.step2Desc') },
+        { icon: '⚙', title: this.t('ob.step3Title'), desc: this.t('ob.step3Desc') }
+      ];
+      const total = steps.length;
+      let cur = 0;
+      const overlay = document.createElement('div');
+      overlay.className = 'ob-overlay';
+      overlay.innerHTML = `
+        <div class="ob-card">
+          <div class="ob-head">
+            <div class="ob-title">${this.esc(this.t('ob.title'))}</div>
+            <div class="ob-sub">${this.esc(this.t('ob.subtitle'))}</div>
+          </div>
+          <div class="ob-body">
+            <div class="ob-icon">${steps[0].icon}</div>
+            <div class="ob-step-title">${this.esc(steps[0].title)}</div>
+            <div class="ob-step-desc">${this.esc(steps[0].desc)}</div>
+          </div>
+          <div class="ob-dots"></div>
+          <div class="ob-foot">
+            <button class="text-btn ob-skip">${this.esc(this.t('ob.skip'))}</button>
+            <button class="text-btn primary ob-next">${this.esc(this.t('ob.next'))}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const dotsBox = overlay.querySelector('.ob-dots');
+      const nextBtn = overlay.querySelector('.ob-next');
+      const skipBtn = overlay.querySelector('.ob-skip');
+
+      const render = () => {
+        dotsBox.innerHTML = steps.map((_, i) =>
+          `<span class="ob-dot${i === cur ? ' on' : ''}"></span>`).join('');
+        overlay.querySelector('.ob-icon').textContent = steps[cur].icon;
+        overlay.querySelector('.ob-step-title').textContent = steps[cur].title;
+        overlay.querySelector('.ob-step-desc').textContent = steps[cur].desc;
+        nextBtn.textContent = cur === total - 1 ? this.t('ob.done') : this.t('ob.next');
+      };
+      const finish = () => {
+        overlay.remove();
+        Store.saveSettings({ onboarded: true });
+      };
+      nextBtn.addEventListener('click', () => {
+        if (cur < total - 1) { cur++; render(); }
+        else finish();
+      });
+      skipBtn.addEventListener('click', finish);
+      overlay.addEventListener('click', e => { if (e.target === overlay) finish(); });
+      render();
+    },
+
     /* ---------- 视图切换 ---------- */
     switchView(view) {
       this.state.view = view;
@@ -208,7 +316,7 @@
       const el = $('#view-custom');
       const p = this.state.customPlugin;
       if (!p) {
-        el.innerHTML = `<div class="page-head"><div class="page-title">插件视图</div><div class="page-desc">未选择插件。</div></div>`;
+        el.innerHTML = `<div class="page-head"><div class="page-title">${this.esc(this.t('view.plugins'))}</div><div class="page-desc">${this.esc(this.t('view.noPlugin'))}</div></div>`;
         return;
       }
       const navLabel = (p.nav && p.nav.length) ? p.nav[0].label : p.name;
@@ -216,7 +324,7 @@
       if (p.pluginData && Object.keys(p.pluginData).length) {
         const rows = Object.entries(p.pluginData).map(([k, v]) =>
           `<div class="setting-row"><div class="sr-label">${this.esc(k)}</div><div class="sr-control" style="color:var(--text-sub)">${this.esc(v)}</div></div>`).join('');
-        dataHtml = `<div class="plugin-section"><h3>插件数据</h3><div class="plugin-list" style="max-width:640px">${rows}</div></div>`;
+        dataHtml = `<div class="plugin-section"><h3>${this.esc(this.t('view.pluginData'))}</h3><div class="plugin-list" style="max-width:640px">${rows}</div></div>`;
       }
       el.innerHTML = `
         <div class="page-head">
@@ -224,12 +332,12 @@
           <div class="page-desc">${this.esc(p.description)}</div>
         </div>
         <div class="plugin-section">
-          <h3>插件信息</h3>
+          <h3>${this.esc(this.t('view.pluginInfo'))}</h3>
           <div class="plugin-list" style="max-width:640px">
             <div class="plugin-item">
               <div class="pi-info">
                 <div class="pi-name">${this.esc(p.name)}</div>
-                <div class="pi-desc">类型：${this.esc(p.type)} · 版本：${this.esc(p.version)} · 作者：${this.esc(p.author || '未知')}</div>
+                <div class="pi-desc">${this.esc(this.t('view.type', { v: p.type }))} · ${this.esc(this.t('view.version', { v: p.version }))} · ${this.esc(this.t('view.author', { v: p.author || this.t('view.unknown') }))}</div>
               </div>
             </div>
           </div>
@@ -245,9 +353,9 @@
       el.innerHTML = `
         <div class="home-view">
           <div class="home-input-wrap">
-            <input class="home-input" id="homeInput" type="text" placeholder="输入计划，回车即添加" autocomplete="off" />
-            ${showBtn ? '<button class="home-quick-btn" id="homeQuickBtn">快捷设置日程</button>' : ''}
-            <div class="home-hint" id="homeHint">已添加</div>
+            <input class="home-input" id="homeInput" type="text" placeholder="${this.esc(this.t('home.placeholder'))}" autocomplete="off" />
+            ${showBtn ? '<button class="home-quick-btn" id="homeQuickBtn">' + this.esc(this.t('home.quickBtn')) + '</button>' : ''}
+            <div class="home-hint" id="homeHint">${this.esc(this.t('home.hint'))}</div>
           </div>
         </div>`;
       const input = $('#homeInput');
@@ -280,7 +388,7 @@
       const text = input.value.trim();
       if (!text) return;
       const res = await API.parseText(text);
-      if (!res.data) { this.toast('未能识别，请换一种说法'); return; }
+      if (!res.data) { this.toast(this.t('home.notRecognized')); return; }
       const r = res.data;
       if (r.ambiguous) {
         this.openAmbiguityPop(r, input);
@@ -292,7 +400,7 @@
       end.setHours(r.hour + 1, r.minute, 0, 0);
       await API.createEvent({
         title: r.title,
-        tag: '日程',
+        tag: this.t('tag.schedule'),
         start: DateUtil.isoLocal(start),
         end: DateUtil.isoLocal(end),
         allDay: false,
@@ -306,6 +414,7 @@
       hint.classList.add('show');
       clearTimeout(this._hintTimer);
       this._hintTimer = setTimeout(() => hint.classList.remove('show'), 2000);
+      this.updateRailMarks(); /* 新增日程后立即刷新收起导航时间轴标点 */
       this.maybeWechatNotify(r.title, start);
     },
 
@@ -315,8 +424,8 @@
       const pop = document.createElement('div');
       pop.className = 'cell-pop ambiguity-pop';
       pop.innerHTML = `
-        <div class="pop-title">「${this.esc(r.title)}」的时间不明确</div>
-        <div class="pop-meta" style="margin:4px 0 10px">${DateUtil.fmtDateCN(r.date)} · 请选择具体时间</div>
+        <div class="pop-title">${this.esc(this.t('view.ambiguous', { title: r.title }))}</div>
+        <div class="pop-meta" style="margin:4px 0 10px">${this.fmtDate(r.date)} · ${this.esc(this.t('view.chooseTime'))}</div>
         <div class="pop-tags">
           ${r.options.map(o => `<button class="pop-tag" data-h="${o.hour}" data-m="${r.minute}">${this.esc(o.label)}</button>`).join('')}
         </div>`;
@@ -330,7 +439,7 @@
           end.setHours(start.getHours() + 1, start.getMinutes(), 0, 0);
           API.createEvent({
             title: r.title,
-            tag: '日程',
+            tag: this.t('tag.schedule'),
             start: DateUtil.isoLocal(start),
             end: DateUtil.isoLocal(end),
             allDay: false,
@@ -341,7 +450,7 @@
           }).then(() => {
             this.closePop();
             if (input) input.value = '';
-            this.toast(`已添加「${r.title}」${DateUtil.fmtDateCN(start)} ${DateUtil.fmtTimeHM(start)}`);
+            this.toast(this.t('toast.added', { title: r.title, date: this.fmtDate(start), time: DateUtil.fmtTimeHM(start) }));
             this.maybeWechatNotify(r.title, start);
             this.refreshView();
           });
@@ -351,30 +460,33 @@
 
     /* ---------- 快捷设置日程面板 ---------- */
     openQuickSet() {
-      this._qs = { date: 0, period: '早上', hour: 8, minute: 0, tag: '日程' };
+      this._qs = { date: 0, period: 'morning', hour: 8, minute: 0, tag: this.t('tag.schedule') };
       const q = this._qs;
       const opt = (attr, val, label, on) =>
         `<button class="quick-opt${on ? ' on' : ''}" data-attr="${attr}" data-val="${this.esc(String(val))}">${this.esc(label)}</button>`;
 
-      $('#quickDate').innerHTML = [[0, '今天'], [1, '明天'], [2, '后天']]
+      $('#quickDate').innerHTML = [[0, this.t('quick.today')], [1, this.t('quick.tomorrow')], [2, this.t('quick.dayAfter')]]
         .map(([v, l]) => opt('date', v, l, q.date === v)).join('');
-      $('#quickPeriod').innerHTML = ['早上', '上午', '中午', '下午', '晚上']
-        .map(p => opt('period', p, p, q.period === p)).join('');
+      $('#quickPeriod').innerHTML = [
+        ['morning', this.t('quick.morning')], ['forenoon', this.t('quick.forenoon')],
+        ['noon', this.t('quick.noon')], ['afternoon', this.t('quick.afternoon')], ['evening', this.t('quick.evening')]
+      ].map(([k, l]) => opt('period', k, l, q.period === k)).join('');
       const hours = [];
       for (let h = 1; h <= 12; h++) hours.push(h);
       $('#quickHour').innerHTML = hours.map(h => opt('hour', h, h, q.hour === h)).join('');
       $('#quickMin').innerHTML = [0, 15, 30, 45]
         .map(m => opt('minute', m, String(m).padStart(2, '0'), q.minute === m)).join('');
 
-      const tags = ['日程', '工作', '运动', '学习'];
+      const tags = [this.t('tag.schedule'), this.t('tag.work'), this.t('tag.sport'), this.t('tag.study')];
       Store.customPlugins.forEach(p => {
         if (p.enabled === false) return;
         (p.tags || []).forEach(t => { if (t.label && !tags.includes(t.label)) tags.push(t.label); });
       });
-      if (Store.plugins.fitness && !tags.includes('健身')) tags.push('健身');
+      if (Store.plugins.fitness && !tags.includes(this.t('tag.fitness'))) tags.push(this.t('tag.fitness'));
       $('#quickTag').innerHTML = tags.map(t => opt('tag', t, t, q.tag === t)).join('');
 
       $('#quickTitle').value = '';
+      $('#quickTitle').placeholder = this.t('quick.titlePh');
       $('#quickMask').hidden = false;
 
       ['quickDate', 'quickPeriod', 'quickHour', 'quickMin', 'quickTag'].forEach(id => {
@@ -399,13 +511,13 @@
     confirmQuickSet() {
       const q = this._qs;
       const title = $('#quickTitle').value.trim();
-      if (!title) { this.toast('请输入日程标题'); return; }
+      if (!title) { this.toast(this.t('quick.emptyTitle')); return; }
       const start = new Date();
       start.setDate(start.getDate() + q.date);
       start.setHours(0, 0, 0, 0);
       let h = q.hour;
-      if (q.period === '中午') h = 12;
-      else if ((q.period === '下午' || q.period === '晚上') && h < 12) h += 12;
+      if (q.period === 'noon') h = 12;
+      else if ((q.period === 'afternoon' || q.period === 'evening') && h < 12) h += 12;
       start.setHours(h, q.minute, 0, 0);
       const end = new Date(start);
       end.setHours(start.getHours() + 1, start.getMinutes(), 0, 0);
@@ -415,7 +527,7 @@
         allDay: false, repeat: 'none', repeatInterval: 1, repeatEnd: null, pluginData: {}
       }).then(() => {
         this.closeQuickSet();
-        this.toast(`已添加「${title}」${DateUtil.fmtDateCN(start)} ${DateUtil.fmtTimeHM(start)}`);
+        this.toast(this.t('toast.added', { title, date: this.fmtDate(start), time: DateUtil.fmtTimeHM(start) }));
         this.refreshView();
       });
     },
@@ -424,8 +536,8 @@
     renderToday() {
       const el = $('#view-today');
       const d = this.state.currentDate;
-      const title = `今日日程·${DateUtil.fmtDateCN(d)}`;
-      const weatherHtml = Store.plugins.weather ? `<div class="weather-bar" id="weatherBar"><span>加载天气…</span></div>` : '';
+      const title = `${this.t('view.today')}·${this.fmtDate(d)}`;
+      const weatherHtml = Store.plugins.weather ? `<div class="weather-bar" id="weatherBar"><span>${this.esc(this.t('view.loadingWeather'))}</span></div>` : '';
 
       let rows = '';
       for (let h = 6; h <= 23; h++) {
@@ -467,14 +579,15 @@
       const d = this.state.currentDate;
       const monday = DateUtil.addDays(d, -((d.getDay() + 6) % 7));
       const sunday = DateUtil.addDays(monday, 6);
-      const title = `周日程·${monday.getMonth() + 1}月${monday.getDate()}日 - ${sunday.getMonth() + 1}月${sunday.getDate()}日`;
+      const title = `${this.t('view.week')}·${this.t('date.weekRange', { m1: monday.getMonth() + 1, d1: monday.getDate(), m2: sunday.getMonth() + 1, d2: sunday.getDate() })}`;
       const todayKey = DateUtil.toKey(new Date());
+      const wdKeys = ['wd.sun', 'wd.mon', 'wd.tue', 'wd.wed', 'wd.thu', 'wd.fri', 'wd.sat'];
 
       let head = `<div class="week-corner"></div>`;
       for (let i = 0; i < 7; i++) {
         const day = DateUtil.addDays(monday, i);
         const key = DateUtil.toKey(day);
-        head += `<div class="week-day${key === todayKey ? ' today' : ''}"><span class="wd-num">${day.getDate()}</span>周${DateUtil.WEEK_CN[day.getDay()]}</div>`;
+        head += `<div class="week-day${key === todayKey ? ' today' : ''}"><span class="wd-num">${day.getDate()}</span>${this.esc(this.t('view.weekday', { day: this.t(wdKeys[day.getDay()]) }))}</div>`;
       }
 
       let body = '';
@@ -515,14 +628,15 @@
       const el = $('#view-month');
       const d = this.state.currentDate;
       const y = d.getFullYear(), m = d.getMonth();
-      const title = `月日程·${y}年${m + 1}月`;
+      const title = `${this.t('view.month')}·${this.t('date.yearMonth', { y, m: m + 1 })}`;
       const first = new Date(y, m, 1);
       const startOffset = (first.getDay() + 6) % 7; // 周一为起点
       const start = DateUtil.addDays(first, -startOffset);
       const todayKey = DateUtil.toKey(new Date());
+      const wdKeys = ['wd.sun', 'wd.mon', 'wd.tue', 'wd.wed', 'wd.thu', 'wd.fri', 'wd.sat'];
 
       let wd = '';
-      for (let i = 0; i < 7; i++) wd += `<div class="month-wd">${['一', '二', '三', '四', '五', '六', '日'][i]}</div>`;
+      for (let i = 0; i < 7; i++) wd += `<div class="month-wd">${this.esc(this.t(wdKeys[(i + 1) % 7]))}</div>`;
 
       let cells = '';
       for (let i = 0; i < 42; i++) {
@@ -535,7 +649,7 @@
         if (key === todayKey) cls.push('today');
         let evHtml = '';
         evs.slice(0, 3).forEach(ev => { evHtml += `<span class="day-event">${this.esc(ev.title)}</span>`; });
-        if (evs.length > 3) evHtml += `<span class="day-more">+${evs.length - 3} 项</span>`;
+        if (evs.length > 3) evHtml += `<span class="day-more">${this.esc(this.t('view.more', { n: evs.length - 3 }))}</span>`;
         cells += `<div class="${cls.join(' ')}" data-key="${key}"><span class="day-num">${day.getDate()}</span><div class="day-events">${evHtml}</div></div>`;
       }
 
@@ -556,11 +670,11 @@
       const el = $('#view-plugins');
       const p = Store.plugins;
       const installed = [
-        { key: 'card', name: '卡片式样式包', desc: '让每个日程变成带圆角背景的小卡片。', tag: '样式 · 官方' },
-        { key: 'weather', name: '带天气栏', desc: '在日程表格顶部增加当天的天气简标。', tag: '样式 · 官方' },
-        { key: 'progress', name: '带进度条', desc: '在日程下方显示完成进度。', tag: '样式 · 官方' },
-        { key: 'fitness', name: '健身插件', desc: '点击时间格时扩展出「健身」标签，可继续选择训练部位。', tag: '功能 · 社区' },
-        { key: 'wechat', name: '微信通知插件', desc: '日程时间到达时，通过本地服务向微信发送提醒。', tag: '功能 · 社区' }
+        { key: 'card', name: this.t('plugin.card'), desc: this.t('plugin.cardDesc'), tag: this.t('plugin.styleOfficial') },
+        { key: 'weather', name: this.t('plugin.weather'), desc: this.t('plugin.weatherDesc'), tag: this.t('plugin.styleOfficial') },
+        { key: 'progress', name: this.t('plugin.progress'), desc: this.t('plugin.progressDesc'), tag: this.t('plugin.styleOfficial') },
+        { key: 'fitness', name: this.t('plugin.fitness'), desc: this.t('plugin.fitnessDesc'), tag: this.t('plugin.funcCommunity') },
+        { key: 'wechat', name: this.t('plugin.wechat'), desc: this.t('plugin.wechatDesc'), tag: this.t('plugin.funcCommunity') }
       ];
 
       const installedHtml = installed.map(it => `
@@ -575,29 +689,29 @@
 
       el.innerHTML = `
         <div class="page-head">
-          <div class="page-title">插件视图</div>
-          <div class="page-desc">插件是极简日程表的核心扩展机制：给点击标签增加选项、新增导航入口、改变表格样式、接入外部服务。插件不是可执行程序，由内置安全引擎加载。</div>
+          <div class="page-title">${this.esc(this.t('view.plugins'))}</div>
+          <div class="page-desc">${this.esc(this.t('plugins.desc'))}</div>
         </div>
         <div class="plugin-section">
-          <h3>用 AI 制作你的插件</h3>
+          <h3>${this.esc(this.t('plugins.designFile'))}</h3>
           <div class="design-card">
             <div class="dc-text">
-              <div class="dc-title">插件设计文件</div>
-              <div class="dc-desc">下载设计文件，发送给任意 AI（豆包 / DeepSeek / 千问等），说明你想要的插件功能，AI 会按标准格式生成插件文件，导入即可使用。</div>
+              <div class="dc-title">${this.esc(this.t('plugins.downloadDesign'))}</div>
+              <div class="dc-desc">${this.esc(this.t('plugins.designDesc'))}</div>
             </div>
             <div class="dc-actions">
-              <button class="text-btn primary" id="dlDesign2">下载设计文件</button>
-              <button class="text-btn" id="goSettings2">去设置</button>
+              <button class="text-btn primary" id="dlDesign2">${this.esc(this.t('plugins.download'))}</button>
+              <button class="text-btn" id="goSettings2">${this.esc(this.t('settings.plugins'))}</button>
             </div>
           </div>
         </div>
         <div class="plugin-section">
-          <h3>已安装插件</h3>
+          <h3>${this.esc(this.t('plugins.installed'))}</h3>
           <div class="plugin-list">${installedHtml}</div>
         </div>
         <div class="plugin-section">
-          <h3>插件市场 · 精选推荐</h3>
-          <div class="market-list" id="marketList"><div class="pi-desc">加载中…</div></div>
+          <h3>${this.esc(this.t('plugins.market'))}</h3>
+          <div class="market-list" id="marketList"><div class="pi-desc">${this.esc(this.t('misc.loading'))}</div></div>
         </div>`;
 
       $('#dlDesign2').addEventListener('click', () => this.downloadDesignFile());
@@ -609,7 +723,7 @@
           Store.savePlugins({ [key]: !Store.plugins[key] });
           this.applyPlugins();
           this.renderPlugins();
-          this.toast(Store.plugins[key] ? `已启用「${this.pluginName(key)}」` : `已停用「${this.pluginName(key)}」`);
+          this.toast(Store.plugins[key] ? this.t('plugins.enabled2', { name: this.pluginName(key) }) : this.t('plugins.disabled2', { name: this.pluginName(key) }));
         });
       });
 
@@ -619,15 +733,15 @@
           <div class="mi-name">${m.name}</div>
           <div class="mi-desc">${m.desc}</div>
           <div class="mi-meta">${m.meta}</div>
-          <button class="text-btn primary mi-btn" data-id="${m.id}">安装</button>
+          <button class="text-btn primary mi-btn" data-id="${m.id}">${this.esc(this.t('misc.install'))}</button>
         </div>`).join('');
       $('#marketList').querySelectorAll('.mi-btn').forEach(btn => {
-        btn.addEventListener('click', () => this.toast('已安装（演示）：' + btn.parentElement.querySelector('.mi-name').textContent));
+        btn.addEventListener('click', () => this.toast(this.t('plugins.installedDemo') + btn.parentElement.querySelector('.mi-name').textContent));
       });
     },
 
     pluginName(key) {
-      const map = { card: '卡片式样式包', weather: '带天气栏', progress: '带进度条', fitness: '健身插件', wechat: '微信通知插件' };
+      const map = { card: this.t('plugin.card'), weather: this.t('plugin.weather'), progress: this.t('plugin.progress'), fitness: this.t('plugin.fitness'), wechat: this.t('plugin.wechat') };
       return map[key] || key;
     },
 
@@ -648,9 +762,9 @@
 
     openTagPop(anchor, date, hour) {
       this.closePop();
-      const tags = ['日程', '工作', '运动', '学习'];
+      const tags = [this.t('tag.schedule'), this.t('tag.work'), this.t('tag.sport'), this.t('tag.study')];
       const tagSubs = {};
-      if (Store.plugins.fitness) { tags.push('健身'); tagSubs['健身'] = ['胸', '背', '腿', '肩', '手臂']; }
+      if (Store.plugins.fitness) { tags.push(this.t('tag.fitness')); tagSubs[this.t('tag.fitness')] = [this.t('tag.chest'), this.t('tag.back'), this.t('tag.leg'), this.t('tag.shoulder'), this.t('tag.arm')]; }
       Store.customPlugins.forEach(p => {
         if (p.enabled === false) return;
         (p.tags || []).forEach(t => {
@@ -662,12 +776,12 @@
       const pop = document.createElement('div');
       pop.className = 'cell-pop';
       pop.innerHTML = `
-        <div class="pop-tags">${tagHtml}<button class="pop-tag" data-tag="__custom">自定义</button></div>
+        <div class="pop-tags">${tagHtml}<button class="pop-tag" data-tag="__custom">${this.esc(this.t('tag.custom'))}</button></div>
         <div class="pop-custom" style="display:none">
-          <input type="text" placeholder="输入日程标题" maxlength="30" />
-          <button class="text-btn primary">确定</button>
+          <input type="text" placeholder="${this.esc(this.t('edit.customTitle'))}" maxlength="30" />
+          <button class="text-btn primary">${this.esc(this.t('edit.confirm'))}</button>
         </div>
-        <div class="pop-meta">${DateUtil.fmtDateCN(date)} ${String(hour).padStart(2, '0')}:00</div>`;
+        <div class="pop-meta">${this.fmtDate(date)} ${String(hour).padStart(2, '0')}:00</div>`;
       document.body.appendChild(pop);
       this.positionPop(pop, anchor);
 
@@ -698,7 +812,7 @@
       const confirmBtn = pop.querySelector('.pop-custom .text-btn');
       const doCustom = () => {
         const v = input.value.trim();
-        if (v) this.createFromTag(date, hour, v, '自定义');
+        if (v) this.createFromTag(date, hour, v, this.t('tag.custom'));
       };
       confirmBtn.addEventListener('click', doCustom);
       input.addEventListener('keydown', e => { if (e.key === 'Enter') doCustom(); });
@@ -712,10 +826,10 @@
       pop.innerHTML = `
         <div class="pop-edit">
           <input type="text" value="${this.esc(ev.title)}" maxlength="30" />
-          <div class="pop-meta">${DateUtil.fmtDateCN(start)} ${DateUtil.fmtTimeHM(start)} · ${ev.tag}</div>
+          <div class="pop-meta">${this.fmtDate(start)} ${DateUtil.fmtTimeHM(start)} · ${this.esc(ev.tag)}</div>
           <div class="pop-actions">
-            <button class="text-btn danger" data-act="del">删除</button>
-            <button class="text-btn primary" data-act="save">保存</button>
+            <button class="text-btn danger" data-act="del">${this.esc(this.t('edit.delete'))}</button>
+            <button class="text-btn primary" data-act="save">${this.esc(this.t('edit.save'))}</button>
           </div>
         </div>`;
       document.body.appendChild(pop);
@@ -796,11 +910,11 @@
 
     renderSettingsCats(active) {
       const cats = [
-        { key: 'appearance', label: '外观设置' },
-        { key: 'parse', label: '语义解析' },
-        { key: 'plugins', label: '插件管理' },
-        { key: 'data', label: '数据管理' },
-        { key: 'info', label: '程序信息' }
+        { key: 'appearance', label: this.t('settings.appearance') },
+        { key: 'parse', label: this.t('settings.parse') },
+        { key: 'plugins', label: this.t('settings.plugins') },
+        { key: 'data', label: this.t('settings.data') },
+        { key: 'info', label: this.t('settings.info') }
       ];
       $('#settingsCats').innerHTML = cats.map(c =>
         `<button class="settings-cat${c.key === active ? ' active' : ''}" data-cat="${c.key}">${c.label}</button>`).join('');
@@ -821,21 +935,21 @@
     renderSettingsPlugins(box) {
       const p = Store.plugins;
       const installed = [
-        { key: 'card', name: '卡片式样式包', desc: '日程变成带圆角背景的小卡片。' },
-        { key: 'weather', name: '带天气栏', desc: '表格顶部增加当天天气简标。' },
-        { key: 'progress', name: '带进度条', desc: '日程下方显示完成进度。' },
-        { key: 'fitness', name: '健身插件', desc: '点击标签时扩展「健身」及训练部位。' },
-        { key: 'wechat', name: '微信通知插件', desc: '日程到达时向微信发送提醒。' }
+        { key: 'card', name: this.t('plugin.card'), desc: this.t('plugin.cardDesc2') },
+        { key: 'weather', name: this.t('plugin.weather'), desc: this.t('plugin.weatherDesc2') },
+        { key: 'progress', name: this.t('plugin.progress'), desc: this.t('plugin.progressDesc2') },
+        { key: 'fitness', name: this.t('plugin.fitness'), desc: this.t('plugin.fitnessDesc2') },
+        { key: 'wechat', name: this.t('plugin.wechat'), desc: this.t('plugin.wechatDesc2') }
       ];
       const customHtml = Store.customPlugins.map(cp => `
         <div class="plugin-item">
           <div class="pi-info">
             <div class="pi-name">${this.esc(cp.name)}</div>
             <div class="pi-desc">${this.esc(cp.description || '')}</div>
-            <div class="pi-tag">自定义 · ${this.esc(cp.type)} · v${this.esc(cp.version)}${cp.enabled === false ? ' · 已停用' : ''}</div>
+            <div class="pi-tag">${this.esc(this.t('tag.custom'))} · ${this.esc(cp.type)} · v${this.esc(cp.version)}${cp.enabled === false ? ' · ' + this.esc(this.t('plugins.disabled')) : ''}</div>
           </div>
           <div class="pi-actions">
-            <button class="text-btn danger" data-cp-del="${this.esc(cp.id)}">删除</button>
+            <button class="text-btn danger" data-cp-del="${this.esc(cp.id)}">${this.esc(this.t('plugins.delete'))}</button>
             <button class="switch${cp.enabled !== false ? ' on' : ''}" data-cp-toggle="${this.esc(cp.id)}" role="switch" aria-checked="${cp.enabled !== false}"></button>
           </div>
         </div>`).join('');
@@ -846,32 +960,32 @@
         return `
           <div class="plugin-item">
             <div class="pi-info"><div class="pi-name">${meta.name}</div><div class="pi-desc">${meta.desc}</div></div>
-            <button class="text-btn primary" data-pk-restore="${key}">恢复</button>
+            <button class="text-btn primary" data-pk-restore="${key}">${this.esc(this.t('plugins.restore'))}</button>
           </div>`;
       }).join('');
 
       box.innerHTML = `
-        <h4>插件管理</h4>
-        <p class="sc-desc">插件是程序最核心的扩展机制。安装方式：插件市场一键安装、导入插件文件、或输入 GitHub 仓库地址拉取。</p>
+        <h4>${this.esc(this.t('plugins.title'))}</h4>
+        <p class="sc-desc keep-desc">${this.esc(this.t('plugins.desc'))}</p>
         <div class="plugin-section">
-          <h5>插件设计文件</h5>
-          <p class="sc-desc">把设计文件发给任意 AI（豆包 / DeepSeek / 千问等），说明你想要的插件功能，AI 会按标准格式生成插件文件，导入即可使用。</p>
+          <h5>${this.esc(this.t('plugins.designFile'))}</h5>
+          <p class="sc-desc keep-desc">${this.esc(this.t('plugins.designDesc'))}</p>
           <div class="setting-row">
-            <div><div class="sr-label">下载插件设计文件</div><div class="sr-desc">.md 文本，可直接发送给 AI</div></div>
+            <div><div class="sr-label">${this.esc(this.t('plugins.downloadDesign'))}</div><div class="sr-desc">${this.esc(this.t('plugins.downloadDesignDesc'))}</div></div>
             <div class="sr-control">
-              <button class="text-btn primary" id="dlDesign">下载</button>
-              <button class="text-btn" id="copyDesign">复制</button>
+              <button class="text-btn primary" id="dlDesign">${this.esc(this.t('plugins.download'))}</button>
+              <button class="text-btn" id="copyDesign">${this.esc(this.t('plugins.copy'))}</button>
             </div>
           </div>
         </div>
         <div class="plugin-section">
-          <h5>已安装插件</h5>
+          <h5>${this.esc(this.t('plugins.installed'))}</h5>
           <div class="plugin-list">
             ${installed.map(it => `
               <div class="plugin-item">
                 <div class="pi-info"><div class="pi-name">${it.name}</div><div class="pi-desc">${it.desc}</div></div>
                 <div class="pi-actions">
-                  <button class="text-btn danger" data-pk-del="${it.key}">删除</button>
+                  <button class="text-btn danger" data-pk-del="${it.key}">${this.esc(this.t('plugins.delete'))}</button>
                   <button class="switch${p[it.key] ? ' on' : ''}" data-key="${it.key}" role="switch" aria-checked="${!!p[it.key]}"></button>
                 </div>
               </div>`).join('')}
@@ -879,21 +993,21 @@
         </div>
         ${removedHtml ? `
         <div class="plugin-section">
-          <h5>已删除插件</h5>
-          <p class="sc-desc">删除的预设插件不再出现在列表中，可随时恢复。</p>
+          <h5>${this.esc(this.t('plugins.removed'))}</h5>
+          <p class="sc-desc">${this.esc(this.t('plugins.removedDesc'))}</p>
           <div class="plugin-list">${removedHtml}</div>
         </div>` : ''}
         <div class="plugin-section">
-          <h5>自定义插件</h5>
-          ${customHtml ? `<div class="plugin-list">${customHtml}</div>` : '<p class="sc-desc">还没有自定义插件。下载上面的设计文件发给 AI，或直接导入 AI 生成的插件文件。</p>'}
+          <h5>${this.esc(this.t('plugins.custom'))}</h5>
+          ${customHtml ? `<div class="plugin-list">${customHtml}</div>` : `<p class="sc-desc">${this.esc(this.t('plugins.noCustom'))}</p>`}
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">导入插件文件</div><div class="sr-desc">选择 AI 生成的 .json 插件文件</div></div>
-          <div class="sr-control"><input type="file" id="importPlugin" accept=".json,application/json" style="display:none"><button class="text-btn primary" id="importBtn">选择文件</button></div>
+          <div><div class="sr-label">${this.esc(this.t('plugins.importFile'))}</div><div class="sr-desc">${this.esc(this.t('plugins.importFileDesc'))}</div></div>
+          <div class="sr-control"><input type="file" id="importPlugin" accept=".json,application/json" style="display:none"><button class="text-btn primary" id="importBtn">${this.esc(this.t('plugins.selectFile'))}</button></div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">从 GitHub 仓库导入</div><div class="sr-desc">输入仓库地址，程序自动拉取安装</div></div>
-          <div class="sr-control"><input class="ctl-input" id="ghInput" placeholder="https://github.com/user/repo"><button class="text-btn primary" id="ghBtn">导入</button></div>
+          <div><div class="sr-label">${this.esc(this.t('plugins.importGh'))}</div><div class="sr-desc">${this.esc(this.t('plugins.importGhDesc'))}</div></div>
+          <div class="sr-control"><input class="ctl-input" id="ghInput" placeholder="https://github.com/user/repo"><button class="text-btn primary" id="ghBtn">${this.esc(this.t('plugins.import'))}</button></div>
         </div>`;
 
       box.querySelectorAll('.switch[data-key]').forEach(sw => {
@@ -902,7 +1016,7 @@
           Store.savePlugins({ [key]: !Store.plugins[key] });
           this.applyPlugins();
           this.renderSettingsPlugins(box);
-          this.toast(Store.plugins[key] ? '已启用' : '已停用');
+          this.toast(Store.plugins[key] ? this.t('plugins.enabled') : this.t('plugins.disabled'));
         });
       });
       box.querySelectorAll('.switch[data-cp-toggle]').forEach(sw => {
@@ -927,18 +1041,18 @@
       });
       $('#ghBtn').addEventListener('click', () => {
         const url = $('#ghInput').value.trim();
-        this.toast(url ? `已从 ${url} 拉取插件（演示）` : '请输入 GitHub 仓库地址');
+        this.toast(url ? this.t('plugins.ghPull', { url }) : this.t('plugins.ghEmpty'));
       });
     },
 
     /* ---------- 插件设计文件：下载 / 复制 ---------- */
     downloadDesignFile() {
-      this.download('YDSchedule插件设计文件.md', PLUGIN_DESIGN_FILE, 'text/markdown;charset=utf-8');
-      this.toast('已下载插件设计文件');
+      this.download('YDSchedule-plugin-design.md', PLUGIN_DESIGN_FILE, 'text/markdown;charset=utf-8');
+      this.toast(this.t('plugins.downloaded'));
     },
 
     copyDesignFile() {
-      const done = () => this.toast('已复制，可直接粘贴发给 AI');
+      const done = () => this.toast(this.t('plugins.copied'));
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(PLUGIN_DESIGN_FILE).then(done).catch(() => this.fallbackCopy(done));
       } else {
@@ -954,7 +1068,7 @@
       document.body.appendChild(ta);
       ta.select();
       try { document.execCommand('copy'); done(); }
-      catch (e) { this.toast('复制失败，请使用下载按钮'); }
+      catch (e) { this.toast(this.t('plugins.copyFail')); }
       ta.remove();
     },
 
@@ -966,18 +1080,18 @@
         try {
           data = JSON.parse(reader.result);
         } catch (e) {
-          this.toast('导入失败：不是有效的 JSON 文件');
+          this.toast(this.t('plugins.importFail'));
           return;
         }
         const err = this.validatePlugin(data);
-        if (err) { this.toast('导入失败：' + err); return; }
+        if (err) { this.toast(this.t('plugins.importFail2', { msg: err })); return; }
         const exists = Store.customPlugins.some(x => x.id === data.id);
         if (exists) {
           Store.updateCustomPlugin(data.id, data);
-          this.toast(`已更新插件「${data.name}」`);
+          this.toast(this.t('plugins.updated', { name: data.name }));
         } else {
           Store.addCustomPlugin(data);
-          this.toast(`已导入插件「${data.name}」`);
+          this.toast(this.t('plugins.imported', { name: data.name }));
         }
         this.applyPlugins();
         this.renderNav();
@@ -987,12 +1101,12 @@
     },
 
     validatePlugin(d) {
-      if (!d || typeof d !== 'object') return '文件内容不是对象';
-      if (!d.id || typeof d.id !== 'string') return '缺少 id 字段';
-      if (!d.name || typeof d.name !== 'string') return '缺少 name 字段';
-      if (!d.version || typeof d.version !== 'string') return '缺少 version 字段';
-      if (!d.description || typeof d.description !== 'string') return '缺少 description 字段';
-      if (!d.type || typeof d.type !== 'string') return '缺少 type 字段';
+      if (!d || typeof d !== 'object') return this.t('plugin.err.notObj');
+      if (!d.id || typeof d.id !== 'string') return this.t('plugin.err.noId');
+      if (!d.name || typeof d.name !== 'string') return this.t('plugin.err.noName');
+      if (!d.version || typeof d.version !== 'string') return this.t('plugin.err.noVersion');
+      if (!d.description || typeof d.description !== 'string') return this.t('plugin.err.noDesc');
+      if (!d.type || typeof d.type !== 'string') return this.t('plugin.err.noType');
       return null;
     },
 
@@ -1002,28 +1116,28 @@
       this.applyPlugins();
       this.renderNav();
       this.openSettings('plugins');
-      this.toast(p.enabled ? `已启用「${p.name}」` : `已停用「${p.name}」`);
+      this.toast(p.enabled ? this.t('plugins.enabled2', { name: p.name }) : this.t('plugins.disabled2', { name: p.name }));
     },
 
     deleteCustomPlugin(id) {
       const p = Store.customPlugins.find(x => x.id === id);
       if (!p) return;
-      if (confirm(`确定删除插件「${p.name}」？`)) {
+      if (confirm(this.t('plugins.confirmDelCustom', { name: p.name }))) {
         Store.removeCustomPlugin(id);
         this.applyPlugins();
         this.renderNav();
         this.openSettings('plugins');
-        this.toast('已删除插件');
+        this.toast(this.t('plugins.deleted'));
       }
     },
 
     deletePresetPlugin(key) {
       const name = this.pluginName(key);
-      if (confirm(`确定删除预设插件「${name}」？删除后可在插件管理中恢复。`)) {
+      if (confirm(this.t('plugins.confirmDelPreset', { name }))) {
         Store.removePresetPlugin(key);
         this.applyPlugins();
         this.openSettings('plugins');
-        this.toast(`已删除「${name}」`);
+        this.toast(this.t('plugins.deleted') + '「' + name + '」');
       }
     },
 
@@ -1031,143 +1145,169 @@
       Store.restorePresetPlugin(key);
       this.applyPlugins();
       this.openSettings('plugins');
-      this.toast(`已恢复「${this.pluginName(key)}」`);
+      this.toast(this.t('plugins.restored') + '「' + this.pluginName(key) + '」');
     },
 
     renderSettingsInfo(box) {
       const s = Store.settings;
       box.innerHTML = `
-        <h4>程序信息</h4>
-        <p class="sc-desc">极简日程表（YDSchedule）v0.14 · Web 原型。四端可用的个人时间管理工具：极度专注、高自由度定制，数据全部保存在本地，无需联网注册账号。</p>
+        <h4>${this.esc(this.t('info.title'))}</h4>
+        <p class="sc-desc">${this.esc(this.t('info.desc'))}</p>
         <div class="setting-row">
-          <div><div class="sr-label">检查更新</div><div class="sr-desc">${s.updateUrl ? '从配置的更新源拉取版本清单并比较' : '未配置更新源，检查更新不可用'}</div></div>
-          <div class="sr-control"><button class="text-btn primary" id="checkUpdate">检查更新</button></div>
+          <div><div class="sr-label">${this.esc(this.t('info.author'))}</div><div class="sr-desc">${this.esc(this.t('info.authorDesc'))}</div></div>
+          <div class="sr-control"><span style="color:var(--text-sub)">${this.esc(this.t('info.authorName'))} · ${this.esc(this.t('info.appName'))} (${this.esc(this.t('info.appEn'))})</span></div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">更新源地址</div><div class="sr-desc">指向 latest.json 版本清单的 URL，例如 https://example.com/updates/latest.json</div></div>
-          <div class="sr-control"><input class="ctl-input" id="updateUrl" type="url" placeholder="https://…/latest.json" value="${this.esc(s.updateUrl || '')}" style="width:240px"><button class="text-btn primary" id="saveUpdateUrl">保存</button></div>
+          <div><div class="sr-label">${this.esc(this.t('info.checkUpdate'))}</div><div class="sr-desc">${s.updateUrl ? this.esc(this.t('info.checkUpdateDesc')) : this.esc(this.t('info.checkUpdateDesc2'))}</div></div>
+          <div class="sr-control"><button class="text-btn primary" id="checkUpdate">${this.esc(this.t('info.checkUpdate'))}</button></div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">版本</div><div class="sr-desc">当前版本</div></div>
-          <div class="sr-control"><span style="color:var(--text-sub)">v0.14</span></div>
+          <div><div class="sr-label">${this.esc(this.t('info.updateUrl'))}</div><div class="sr-desc">${this.esc(this.t('info.updateUrlDesc'))}</div></div>
+          <div class="sr-control"><input class="ctl-input" id="updateUrl" type="url" placeholder="https://…/latest.json" value="${this.esc(s.updateUrl || '')}" style="width:240px"><button class="text-btn primary" id="saveUpdateUrl">${this.esc(this.t('misc.save'))}</button></div>
+        </div>
+        <div class="setting-row">
+          <div><div class="sr-label">${this.esc(this.t('info.version'))}</div><div class="sr-desc">${this.esc(this.t('info.versionDesc'))}</div></div>
+          <div class="sr-control"><span style="color:var(--text-sub)">v0.15</span></div>
         </div>
         <div class="update-result" id="updateResult" style="display:none"></div>`;
       $('#checkUpdate').addEventListener('click', async () => {
-        this.toast('正在检查更新…');
+        this.toast(this.t('info.checking'));
         const res = await API.checkUpdate();
         const d = res.data;
         const box2 = $('#updateResult');
         box2.style.display = 'block';
         if (d.source === 'none') {
-          box2.innerHTML = `<p class="sc-desc" style="color:var(--accent)">未配置更新源，无法检查更新。请在「更新源地址」中填写版本清单 URL，或直接下载最新安装包。</p>`;
+          box2.innerHTML = `<p class="sc-desc" style="color:var(--accent)">${this.esc(this.t('info.noSource'))}</p>`;
         } else if (d.error) {
           box2.innerHTML = `<p class="sc-desc" style="color:var(--accent)">${this.esc(d.error)}</p>`;
         } else if (d.hasUpdate) {
           box2.innerHTML = `
-            <p class="sc-desc" style="color:var(--accent)">发现新版本 ${this.esc(d.latest)}${d.notes ? '：' + this.esc(d.notes) : ''}</p>
-            ${d.url ? `<button class="text-btn primary" id="goDownload">下载新版本</button>` : ''}`;
+            <p class="sc-desc" style="color:var(--accent)">${this.esc(this.t('info.newVersion', { v: d.latest }))}${d.notes ? '：' + this.esc(d.notes) : ''}</p>
+            ${d.url ? `<button class="text-btn primary" id="goDownload">${this.esc(this.t('info.download'))}</button>` : ''}`;
           const go = $('#goDownload');
           if (go) go.addEventListener('click', () => {
             if (window.open) { window.open(d.url, '_blank'); }
             else { location.href = d.url; }
           });
         } else {
-          box2.innerHTML = `<p class="sc-desc">已是最新版本 v0.14。</p>`;
+          box2.innerHTML = `<p class="sc-desc">${this.esc(this.t('info.latest'))}</p>`;
         }
       });
       $('#saveUpdateUrl').addEventListener('click', () => {
         const v = $('#updateUrl').value.trim();
         Store.saveSettings({ updateUrl: v });
         this.renderSettingsInfo(box);
-        this.toast(v ? '更新源已保存' : '已清除更新源');
+        this.toast(v ? this.t('info.urlSaved') : this.t('info.urlCleared'));
       });
     },
 
     renderSettingsAppearance(box) {
       const s = Store.settings;
       const themes = [
-        { key: 'paper', label: '舒适阅读' },
-        { key: 'white', label: '极简白' },
-        { key: 'ink', label: '墨绿' },
-        { key: 'night', label: '深夜' }
+        { key: 'paper', label: this.t('theme.paper') },
+        { key: 'white', label: this.t('theme.white') },
+        { key: 'ink', label: this.t('theme.ink') },
+        { key: 'night', label: this.t('theme.night') }
       ];
       const sizes = [
-        { key: 'sm', label: '小' },
-        { key: 'md', label: '中' },
-        { key: 'lg', label: '大' }
+        { key: 'sm', label: this.t('size.sm') },
+        { key: 'md', label: this.t('size.md') },
+        { key: 'lg', label: this.t('size.lg') }
       ];
       const quickSetOpts = [
-        { key: 'both', label: '长按+按钮' },
-        { key: 'longpress', label: '仅长按' },
-        { key: 'button', label: '仅按钮' },
-        { key: 'off', label: '关闭' }
+        { key: 'both', label: this.t('qs.both') },
+        { key: 'longpress', label: this.t('qs.longpress') },
+        { key: 'button', label: this.t('qs.button') },
+        { key: 'off', label: this.t('qs.off') }
       ];
       const bgTypes = [
-        { key: 'none', label: '默认' },
-        { key: 'color', label: '纯色' },
-        { key: 'image', label: '图片' }
+        { key: 'none', label: this.t('bg.none') },
+        { key: 'color', label: this.t('bg.color') },
+        { key: 'image', label: this.t('bg.image') }
       ];
+      const langNames = {
+        'zh-CN': (L10N['zh-CN'] && L10N['zh-CN']['lang.name']) || '简体中文',
+        'zh-TW': (L10N['zh-TW'] && L10N['zh-TW']['lang.name']) || '繁體中文',
+        'en': (L10N['en'] && L10N['en']['lang.name']) || 'English',
+        'fr': (L10N['fr'] && L10N['fr']['lang.name']) || 'Français',
+        'ru': (L10N['ru'] && L10N['ru']['lang.name']) || 'Русский',
+        'es': (L10N['es'] && L10N['es']['lang.name']) || 'Español',
+        'ar': (L10N['ar'] && L10N['ar']['lang.name']) || 'العربية'
+      };
+      const langs = Object.keys(langNames).map(key => ({ key, label: langNames[key] }));
       const swatches = ['#F3F0E9', '#F7F7F5', '#EEF0E8', '#26241F', '#C25E4E', '#8A7A3F', '#5B8A72', '#4A6FA5'];
       box.innerHTML = `
-        <h4>外观设置</h4>
-        <p class="sc-desc">程序默认使用「舒适阅读」主题，也可切换到其他预设主题、纯色背景或自定义图片背景。</p>
+        <h4>${this.esc(this.t('appearance.title'))}</h4>
+        <p class="sc-desc">${this.esc(this.t('appearance.desc'))}</p>
         <div class="setting-row">
-          <div><div class="sr-label">主题</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.theme'))}</div></div>
           <div class="sr-control theme-options">
-            ${themes.map(t => `<button class="theme-opt${s.theme === t.key ? ' active' : ''}" data-theme="${t.key}">${t.label}</button>`).join('')}
+            ${themes.map(t => `<button class="theme-opt${s.theme === t.key ? ' active' : ''}" data-theme="${t.key}">${this.esc(t.label)}</button>`).join('')}
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">字号</div><div class="sr-desc">标题 / 正文 / 辅助文字三档</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.fontSize'))}</div><div class="sr-desc">${this.esc(this.t('appearance.fontSizeDesc'))}</div></div>
           <div class="sr-control theme-options">
-            ${sizes.map(t => `<button class="theme-opt${s.fontSize === t.key ? ' active' : ''}" data-size="${t.key}">${t.label}</button>`).join('')}
+            ${sizes.map(t => `<button class="theme-opt${s.fontSize === t.key ? ' active' : ''}" data-size="${t.key}">${this.esc(t.label)}</button>`).join('')}
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">背景</div><div class="sr-desc">默认 / 纯色 / 自定义图片</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.inputSize'))}</div><div class="sr-desc">${this.esc(this.t('appearance.inputSizeDesc'))}</div></div>
           <div class="sr-control theme-options">
-            ${bgTypes.map(t => `<button class="theme-opt${s.bgType === t.key ? ' active' : ''}" data-bgtype="${t.key}">${t.label}</button>`).join('')}
+            ${sizes.map(t => `<button class="theme-opt${s.inputSize === t.key ? ' active' : ''}" data-inputsize="${t.key}">${this.esc(t.label)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="setting-row">
+          <div><div class="sr-label">${this.esc(this.t('appearance.lang'))}</div><div class="sr-desc">${this.esc(this.t('appearance.langDesc'))}</div></div>
+          <div class="sr-control theme-options">
+            ${langs.map(t => `<button class="theme-opt${s.lang === t.key ? ' active' : ''}" data-lang="${t.key}">${this.esc(t.label)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="setting-row">
+          <div><div class="sr-label">${this.esc(this.t('appearance.bg'))}</div><div class="sr-desc">${this.esc(this.t('appearance.bgDesc'))}</div></div>
+          <div class="sr-control theme-options">
+            ${bgTypes.map(t => `<button class="theme-opt${s.bgType === t.key ? ' active' : ''}" data-bgtype="${t.key}">${this.esc(t.label)}</button>`).join('')}
           </div>
         </div>
         <div class="setting-row" id="bgColorRow" style="display:${s.bgType === 'color' ? 'flex' : 'none'}">
-          <div><div class="sr-label">纯色</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.bgColor'))}</div></div>
           <div class="sr-control">
             <div class="bg-swatches">
-              ${swatches.map(c => `<button class="bg-swatch${s.bgColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" aria-label="背景色 ${c}"></button>`).join('')}
+              ${swatches.map(c => `<button class="bg-swatch${s.bgColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" aria-label="${this.esc(this.t('appearance.bgAria', { c }))}"></button>`).join('')}
             </div>
             <input type="color" class="bg-color-input" id="bgColorInput" value="${this.esc(s.bgColor || '#F3F0E9')}">
           </div>
         </div>
         <div class="setting-row" id="bgImageRow" style="display:${s.bgType === 'image' ? 'flex' : 'none'}">
-          <div><div class="sr-label">背景图片</div><div class="sr-desc">上传一张图片作为日程表格背景</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.bgImage'))}</div><div class="sr-desc">${this.esc(this.t('appearance.bgImageDesc'))}</div></div>
           <div class="sr-control">
             <input type="file" id="bgFile" accept="image/*" style="display:none">
-            <button class="text-btn primary" id="bgBtn">选择图片</button>
-            ${s.bgImage ? '<button class="text-btn" id="bgClear">清除</button>' : ''}
+            <button class="text-btn primary" id="bgBtn">${this.esc(this.t('appearance.bgSelect'))}</button>
+            ${s.bgImage ? '<button class="text-btn" id="bgClear">' + this.esc(this.t('appearance.bgClear')) + '</button>' : ''}
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">主页快捷设置</div><div class="sr-desc">长按输入框或点击按钮，弹出选项设置日程；关闭后回车直接添加</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.quickSet'))}</div><div class="sr-desc">${this.esc(this.t('appearance.quickSetDesc'))}</div></div>
           <div class="sr-control theme-options">
-            ${quickSetOpts.map(o => `<button class="theme-opt${s.quickSet === o.key ? ' active' : ''}" data-quickset="${o.key}">${o.label}</button>`).join('')}
+            ${quickSetOpts.map(o => `<button class="theme-opt${s.quickSet === o.key ? ' active' : ''}" data-quickset="${o.key}">${this.esc(o.label)}</button>`).join('')}
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">时间轴标点</div><div class="sr-desc">今日有日程的小时，在首页收起导航栏时间轴对应位置显示标点</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.railMark'))}</div><div class="sr-desc">${this.esc(this.t('appearance.railMarkDesc'))}</div></div>
           <div class="sr-control theme-options">
-            <button class="theme-opt${s.railMarkColor === 'green' ? ' active' : ''}" data-mark="green">绿色</button>
-            <button class="theme-opt${s.railMarkColor === 'yellow' ? ' active' : ''}" data-mark="yellow">黄色</button>
+            <button class="theme-opt${s.railMarkColor === 'green' ? ' active' : ''}" data-mark="green">${this.esc(this.t('mark.green'))}</button>
+            <button class="theme-opt${s.railMarkColor === 'yellow' ? ' active' : ''}" data-mark="yellow">${this.esc(this.t('mark.yellow'))}</button>
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">当前时间指示</div><div class="sr-desc">时间轴上标示当前时刻的样式</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.railNow'))}</div><div class="sr-desc">${this.esc(this.t('appearance.railNowDesc'))}</div></div>
           <div class="sr-control theme-options">
-            <button class="theme-opt${s.railNowStyle === 'bar' ? ' active' : ''}" data-now="bar">红色横杠</button>
-            <button class="theme-opt${s.railNowStyle === 'dot' ? ' active' : ''}" data-now="dot">红色圆点</button>
+            <button class="theme-opt${s.railNowStyle === 'bar' ? ' active' : ''}" data-now="bar">${this.esc(this.t('now.bar'))}</button>
+            <button class="theme-opt${s.railNowStyle === 'dot' ? ' active' : ''}" data-now="dot">${this.esc(this.t('now.dot'))}</button>
           </div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">导航栏毛玻璃</div><div class="sr-desc">展开侧边导航时使用毛玻璃效果，可透出背景图片</div></div>
+          <div><div class="sr-label">${this.esc(this.t('appearance.navGlass'))}</div><div class="sr-desc">${this.esc(this.t('appearance.navGlassDesc'))}</div></div>
           <div class="sr-control"><button class="switch${s.navGlass !== false ? ' on' : ''}" id="navGlass" role="switch" aria-checked="${s.navGlass !== false}"></button></div>
         </div>`;
 
@@ -1183,6 +1323,24 @@
           Store.saveSettings({ fontSize: btn.dataset.size });
           this.applySettings();
           this.renderSettingsAppearance(box);
+        });
+      });
+      box.querySelectorAll('.theme-opt[data-inputsize]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          Store.saveSettings({ inputSize: btn.dataset.inputsize });
+          this.applySettings();
+          if (this.state.view === 'home') this.renderHome();
+          this.renderSettingsAppearance(box);
+        });
+      });
+      box.querySelectorAll('.theme-opt[data-lang]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          Store.saveSettings({ lang: btn.dataset.lang });
+          this.applyLang();
+          this.renderSettingsCats('appearance');
+          this.renderSettingsAppearance(box);
+          this.renderNav();
+          if (this.state.view === 'home') this.renderHome();
         });
       });
       box.querySelectorAll('.theme-opt[data-bgtype]').forEach(btn => {
@@ -1203,7 +1361,12 @@
         Store.saveSettings({ bgType: 'color', bgColor: e.target.value });
         this.applySettings();
       });
-      $('#bgBtn').addEventListener('click', () => $('#bgFile').click());
+      $('#bgBtn').addEventListener('click', () => {
+        /* 移动端：选择图片前说明权限用途 */
+        if (confirm(this.t('perm.bgTitle') + '\n\n' + this.t('perm.bgDesc'))) {
+          $('#bgFile').click();
+        }
+      });
       $('#bgFile').addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1212,7 +1375,7 @@
           Store.saveSettings({ bgType: 'image', bgImage: reader.result });
           this.applySettings();
           this.renderSettingsAppearance(box);
-          this.toast('背景已应用');
+          this.toast(this.t('toast.bgApplied'));
         };
         reader.readAsDataURL(file);
       });
@@ -1221,7 +1384,7 @@
         Store.saveSettings({ bgType: 'none', bgImage: '' });
         this.applySettings();
         this.renderSettingsAppearance(box);
-        this.toast('已恢复默认背景');
+        this.toast(this.t('toast.bgCleared'));
       });
       box.querySelectorAll('.theme-opt[data-quickset]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1250,7 +1413,7 @@
         Store.saveSettings({ navGlass: !(Store.settings.navGlass !== false) });
         this.applySettings();
         this.renderSettingsAppearance(box);
-        this.toast(Store.settings.navGlass !== false ? '已开启导航栏毛玻璃' : '已关闭导航栏毛玻璃');
+        this.toast(Store.settings.navGlass !== false ? this.t('toast.navGlassOn') : this.t('toast.navGlassOff'));
       });
     },
 
@@ -1258,45 +1421,45 @@
     renderSettingsParse(box) {
       const s = Store.settings;
       const hasKey = !!s.cloudKey;
-      const engine = (s.cloudMode && hasKey) ? '云端语义解析' : '本地语义解析';
-      const warn = (s.cloudMode && !hasKey) ? '<p class="sc-desc" style="color:var(--accent)">已开启云端模式但尚未配置密钥，当前仍使用本地解析。</p>' : '';
+      const engine = (s.cloudMode && hasKey) ? this.t('parse.cloud') : this.t('parse.local');
+      const warn = (s.cloudMode && !hasKey) ? `<p class="sc-desc" style="color:var(--accent)">${this.esc(this.t('parse.warnNoKey'))}</p>` : '';
       box.innerHTML = `
-        <h4>语义解析</h4>
-        <p class="sc-desc">首页输入计划时，程序用语义解析引擎理解时间与内容。默认使用本地引擎：无需联网、数据不出本机；配置云端密钥并开启云端模式后，可切换为云端语义解析。</p>
+        <h4>${this.esc(this.t('parse.title'))}</h4>
+        <p class="sc-desc keep-desc">${this.esc(this.t('parse.desc'))}</p>
         ${warn}
         <div class="setting-row">
-          <div><div class="sr-label">当前解析引擎</div><div class="sr-desc">未开启云端模式时始终使用本地解析</div></div>
-          <div class="sr-control"><span class="engine-badge${engine === '云端语义解析' ? ' cloud' : ''}">${engine}</span></div>
+          <div><div class="sr-label">${this.esc(this.t('parse.engine'))}</div><div class="sr-desc">${this.esc(this.t('parse.engineDesc'))}</div></div>
+          <div class="sr-control"><span class="engine-badge${engine === this.t('parse.cloud') ? ' cloud' : ''}">${this.esc(engine)}</span></div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">启用云端模式</div><div class="sr-desc">开启后才调用云端 API；关闭时默认使用本地语义解析</div></div>
+          <div><div class="sr-label">${this.esc(this.t('parse.cloudMode'))}</div><div class="sr-desc">${this.esc(this.t('parse.cloudModeDesc'))}</div></div>
           <div class="sr-control"><button class="switch${s.cloudMode ? ' on' : ''}" id="cloudMode" role="switch" aria-checked="${!!s.cloudMode}"></button></div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">云端 API 密钥</div><div class="sr-desc">${hasKey ? '已配置，密钥仅保存在本机，界面不显示明文' : '填写后自动隐藏，仅保存在本机'}</div></div>
+          <div><div class="sr-label">${this.esc(this.t('parse.cloudKey'))}</div><div class="sr-desc">${hasKey ? this.esc(this.t('parse.cloudKeyDesc')) : this.esc(this.t('parse.cloudKeyDesc2'))}</div></div>
           <div class="sr-control" id="keyCtrl">
             ${hasKey
-              ? `<span class="key-masked">••••••••</span><button class="text-btn" id="keyEdit">修改</button><button class="text-btn danger" id="keyClear">清除</button>`
-              : `<input class="ctl-input" id="cloudKey" type="password" placeholder="输入 API 密钥" autocomplete="off"><button class="text-btn primary" id="keySave">保存</button>`}
+              ? `<span class="key-masked">••••••••</span><button class="text-btn" id="keyEdit">${this.esc(this.t('parse.keyEdit'))}</button><button class="text-btn danger" id="keyClear">${this.esc(this.t('parse.keyClear'))}</button>`
+              : `<input class="ctl-input" id="cloudKey" type="password" placeholder="${this.esc(this.t('parse.keyPh'))}" autocomplete="off"><button class="text-btn primary" id="keySave">${this.esc(this.t('parse.keySave'))}</button>`}
           </div>
         </div>`;
 
       $('#cloudMode').addEventListener('click', () => {
         Store.saveSettings({ cloudMode: !Store.settings.cloudMode });
         this.renderSettingsParse(box);
-        this.toast(Store.settings.cloudMode ? '已开启云端模式' : '已关闭云端模式，使用本地解析');
+        this.toast(Store.settings.cloudMode ? this.t('parse.cloudOn') : this.t('parse.cloudOff'));
       });
 
       if (hasKey) {
         $('#keyEdit').addEventListener('click', () => {
-          $('#keyCtrl').innerHTML = `<input class="ctl-input" id="cloudKey" type="password" placeholder="输入新密钥" autocomplete="off"><button class="text-btn primary" id="keySave">保存</button>`;
+          $('#keyCtrl').innerHTML = `<input class="ctl-input" id="cloudKey" type="password" placeholder="${this.esc(this.t('parse.keyPh2'))}" autocomplete="off"><button class="text-btn primary" id="keySave">${this.esc(this.t('parse.keySave'))}</button>`;
           this.bindKeySave(box);
           $('#cloudKey').focus();
         });
         $('#keyClear').addEventListener('click', () => {
           Store.saveSettings({ cloudKey: '', cloudMode: false });
           this.renderSettingsParse(box);
-          this.toast('已清除云端密钥');
+          this.toast(this.t('parse.keyCleared'));
         });
       } else {
         this.bindKeySave(box);
@@ -1306,10 +1469,10 @@
     bindKeySave(box) {
       const save = () => {
         const v = $('#cloudKey').value.trim();
-        if (!v) { this.toast('请输入密钥'); return; }
+        if (!v) { this.toast(this.t('parse.keyEmpty')); return; }
         Store.saveSettings({ cloudKey: v });
         this.renderSettingsParse(box);
-        this.toast('密钥已保存，仅存储在本机');
+        this.toast(this.t('parse.keySaved'));
       };
       $('#keySave').addEventListener('click', save);
       $('#cloudKey').addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
@@ -1317,46 +1480,46 @@
 
     renderSettingsData(box) {
       const formats = [
-        { key: 'csv', label: 'CSV 表格' },
-        { key: 'excel', label: 'Excel 工作簿' },
-        { key: 'word', label: 'Word 文档' },
-        { key: 'json', label: 'JSON 备份' },
-        { key: 'ical', label: 'iCal 日历' },
-        { key: 'pdf', label: 'PDF 文档' }
+        { key: 'csv', label: this.t('fmt.csv') },
+        { key: 'excel', label: this.t('fmt.excel') },
+        { key: 'word', label: this.t('fmt.word') },
+        { key: 'json', label: this.t('fmt.json') },
+        { key: 'ical', label: this.t('fmt.ical') },
+        { key: 'pdf', label: this.t('fmt.pdf') }
       ];
       box.innerHTML = `
-        <h4>数据管理</h4>
-        <p class="sc-desc">所有日程数据保存在本地隐藏数据文件夹中。支持多种导出格式，用于存档、汇报或迁移到其他日历应用。</p>
+        <h4>${this.esc(this.t('data.title'))}</h4>
+        <p class="sc-desc">${this.esc(this.t('data.desc'))}</p>
         <div class="setting-row">
-          <div><div class="sr-label">导出日程数据</div><div class="sr-desc">选择格式后点击导出，生成文件下载到本机</div></div>
+          <div><div class="sr-label">${this.esc(this.t('data.export'))}</div><div class="sr-desc">${this.esc(this.t('data.exportDesc'))}</div></div>
           <div class="sr-control">
             <select class="ctl-select" id="exportFmt">
-              ${formats.map(f => `<option value="${f.key}">${f.label}</option>`).join('')}
+              ${formats.map(f => `<option value="${f.key}">${this.esc(f.label)}</option>`).join('')}
             </select>
-            <button class="text-btn primary" id="exportBtn">导出</button>
+            <button class="text-btn primary" id="exportBtn">${this.esc(this.t('data.exportBtn'))}</button>
           </div>
         </div>
         <div class="setting-row" style="margin-top:20px">
-          <div><div class="sr-label">清除全部数据</div><div class="sr-desc">删除本地保存的全部日程</div></div>
-          <div class="sr-control"><button class="text-btn danger" id="clearData">清除</button></div>
+          <div><div class="sr-label">${this.esc(this.t('data.clear'))}</div><div class="sr-desc">${this.esc(this.t('data.clearDesc'))}</div></div>
+          <div class="sr-control"><button class="text-btn danger" id="clearData">${this.esc(this.t('data.clearBtn'))}</button></div>
         </div>
         <div class="setting-row">
-          <div><div class="sr-label">恢复示例数据</div><div class="sr-desc">重新载入演示日程</div></div>
-          <div class="sr-control"><button class="text-btn primary" id="seedData">恢复</button></div>
+          <div><div class="sr-label">${this.esc(this.t('data.seed'))}</div><div class="sr-desc">${this.esc(this.t('data.seedDesc'))}</div></div>
+          <div class="sr-control"><button class="text-btn primary" id="seedData">${this.esc(this.t('data.restore'))}</button></div>
         </div>`;
 
       $('#exportBtn').addEventListener('click', () => this.exportData($('#exportFmt').value));
       $('#clearData').addEventListener('click', () => {
-        if (confirm('确定清除全部日程数据？此操作不可撤销。')) {
+        if (confirm(this.t('data.confirmClear'))) {
           Store.clearAll();
           this.refreshView();
-          this.toast('已清除全部数据');
+          this.toast(this.t('data.cleared'));
         }
       });
       $('#seedData').addEventListener('click', () => {
         Store.reseed();
         this.refreshView();
-        this.toast('已恢复示例数据');
+        this.toast(this.t('data.reseeded'));
       });
     },
 
@@ -1364,14 +1527,14 @@
     exportData(fmt) {
       const evs = Store.events;
       if (fmt === 'csv') {
-        const rows = [['编号', '标题', '开始时间', '结束时间', '全天', '重复', '标签']];
-        evs.forEach(ev => rows.push([ev.id, ev.title, ev.start, ev.end, ev.allDay ? '是' : '否', ev.repeat, ev.tag]));
+        const rows = [[this.t('csv.id'), this.t('csv.title'), this.t('csv.start'), this.t('csv.end'), this.t('csv.allDay'), this.t('csv.repeat'), this.t('csv.tag')]];
+        evs.forEach(ev => rows.push([ev.id, ev.title, ev.start, ev.end, ev.allDay ? this.t('csv.yes') : this.t('csv.no'), ev.repeat, ev.tag]));
         const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
         this.download('ydschedule.csv', '\uFEFF' + csv, 'text/csv;charset=utf-8');
-        this.toast('已导出 CSV');
+        this.toast(this.t('data.exported', { fmt: 'CSV' }));
       } else if (fmt === 'json') {
         this.download('ydschedule.json', JSON.stringify(evs, null, 2), 'application/json');
-        this.toast('已导出 JSON 备份');
+        this.toast(this.t('data.exported', { fmt: 'JSON' }));
       } else if (fmt === 'ical') {
         let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//YDSchedule//CN\r\n';
         evs.forEach(ev => {
@@ -1381,9 +1544,9 @@
         });
         ics += 'END:VCALENDAR\r\n';
         this.download('ydschedule.ics', ics, 'text/calendar');
-        this.toast('已导出 iCal，可导入 Google / 苹果日历');
+        this.toast(this.t('data.exportIcal'));
       } else {
-        this.toast(`原型演示：${fmt.toUpperCase()} 导出将在正式版提供`);
+        this.toast(this.t('data.exportDemo', { fmt: fmt.toUpperCase() }));
       }
     },
 
@@ -1403,7 +1566,7 @@
     maybeWechatNotify(title, time) {
       if (!Store.plugins.wechat) return;
       setTimeout(() => {
-        this.toast(`微信通知（演示）：「${title}」${DateUtil.fmtTimeHM(time)} 已到`);
+        this.toast(this.t('toast.wechat', { title, time: DateUtil.fmtTimeHM(time) }));
       }, 1500);
     },
 
@@ -1422,4 +1585,5 @@
   };
 
   document.addEventListener('DOMContentLoaded', () => App.init());
+  globalThis.App = App;
 })();
