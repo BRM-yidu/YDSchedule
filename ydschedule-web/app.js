@@ -90,7 +90,24 @@
       root.setProperty('--fs-page', f.p);
       root.setProperty('--rail-mark-color', s.railMarkColor === 'yellow' ? '#E0B400' : '#3BA55D');
       document.body.classList.toggle('rail-now-dot', s.railNowStyle === 'dot');
-      document.body.classList.toggle('nav-glass', s.navGlass !== false);
+
+      /* 毛玻璃不透明度：侧边导航 */
+      const navOpa = Math.max(0, Math.min(100, Number(s.navGlassOpacity) || 100));
+      root.setProperty('--nav-panel-opaque', navOpa);
+      /* navGlass 向后兼容：不透明度 < 100 时视为毛玻璃开启 */
+      document.body.classList.toggle('nav-glass', navOpa < 100);
+
+      /* 毛玻璃不透明度：首页输入框 */
+      const inpOpa = Math.max(0, Math.min(100, Number(s.inputGlassOpacity) || 100));
+      root.setProperty('--home-input-opaque', inpOpa);
+      /* 不透明度低于 100 时启用模糊 */
+      const inputBlur = inpOpa < 100 ? (20 * (1 - inpOpa / 100) + 4).toFixed(1) + 'px' : '0px';
+      root.setProperty('--home-input-blur', inputBlur);
+
+      /* 背景不透明度 */
+      const bgOpa = Math.max(0, Math.min(100, Number(s.bgOpacity) || 100));
+      root.setProperty('--bg-opaque-overlay', 100 - bgOpa);
+
       /* 首页输入框大小：sm | md | lg */
       const inp = { sm: { pad: '10px 16px', fs: '14px' }, md: { pad: '14px 20px', fs: '16px' }, lg: { pad: '18px 24px', fs: '19px' } };
       const i = inp[s.inputSize] || inp.md;
@@ -933,14 +950,6 @@
     },
 
     renderSettingsPlugins(box) {
-      const p = Store.plugins;
-      const installed = [
-        { key: 'card', name: this.t('plugin.card'), desc: this.t('plugin.cardDesc2') },
-        { key: 'weather', name: this.t('plugin.weather'), desc: this.t('plugin.weatherDesc2') },
-        { key: 'progress', name: this.t('plugin.progress'), desc: this.t('plugin.progressDesc2') },
-        { key: 'fitness', name: this.t('plugin.fitness'), desc: this.t('plugin.fitnessDesc2') },
-        { key: 'wechat', name: this.t('plugin.wechat'), desc: this.t('plugin.wechatDesc2') }
-      ];
       const customHtml = Store.customPlugins.map(cp => `
         <div class="plugin-item">
           <div class="pi-info">
@@ -954,19 +963,26 @@
           </div>
         </div>`).join('');
 
-      const removedHtml = Store.removedPlugins.map(key => {
-        const meta = installed.find(x => x.key === key);
-        if (!meta) return '';
-        return `
-          <div class="plugin-item">
-            <div class="pi-info"><div class="pi-name">${meta.name}</div><div class="pi-desc">${meta.desc}</div></div>
-            <button class="text-btn primary" data-pk-restore="${key}">${this.esc(this.t('plugins.restore'))}</button>
-          </div>`;
-      }).join('');
+      const officialUrl = 'https://brm-yidu.github.io/YDSchedule/#plugins';
 
       box.innerHTML = `
         <h4>${this.esc(this.t('plugins.title'))}</h4>
         <p class="sc-desc keep-desc">${this.esc(this.t('plugins.desc'))}</p>
+
+        <div class="official-plugins-card">
+          <div class="opc-head">
+            <div class="opc-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="opc-title">${this.esc(this.t('plugins.official'))}</div>
+          </div>
+          <div class="opc-desc">${this.esc(this.t('plugins.officialDesc'))}</div>
+          <button class="opc-btn" id="officialMarketBtn">
+            ${this.esc(this.t('plugins.officialVisit'))}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+          </button>
+        </div>
+
         <div class="plugin-section">
           <h5>${this.esc(this.t('plugins.designFile'))}</h5>
           <p class="sc-desc keep-desc">${this.esc(this.t('plugins.designDesc'))}</p>
@@ -978,25 +994,6 @@
             </div>
           </div>
         </div>
-        <div class="plugin-section">
-          <h5>${this.esc(this.t('plugins.installed'))}</h5>
-          <div class="plugin-list">
-            ${installed.map(it => `
-              <div class="plugin-item">
-                <div class="pi-info"><div class="pi-name">${it.name}</div><div class="pi-desc">${it.desc}</div></div>
-                <div class="pi-actions">
-                  <button class="text-btn danger" data-pk-del="${it.key}">${this.esc(this.t('plugins.delete'))}</button>
-                  <button class="switch${p[it.key] ? ' on' : ''}" data-key="${it.key}" role="switch" aria-checked="${!!p[it.key]}"></button>
-                </div>
-              </div>`).join('')}
-          </div>
-        </div>
-        ${removedHtml ? `
-        <div class="plugin-section">
-          <h5>${this.esc(this.t('plugins.removed'))}</h5>
-          <p class="sc-desc">${this.esc(this.t('plugins.removedDesc'))}</p>
-          <div class="plugin-list">${removedHtml}</div>
-        </div>` : ''}
         <div class="plugin-section">
           <h5>${this.esc(this.t('plugins.custom'))}</h5>
           ${customHtml ? `<div class="plugin-list">${customHtml}</div>` : `<p class="sc-desc">${this.esc(this.t('plugins.noCustom'))}</p>`}
@@ -1010,26 +1007,14 @@
           <div class="sr-control"><input class="ctl-input" id="ghInput" placeholder="https://github.com/user/repo"><button class="text-btn primary" id="ghBtn">${this.esc(this.t('plugins.import'))}</button></div>
         </div>`;
 
-      box.querySelectorAll('.switch[data-key]').forEach(sw => {
-        sw.addEventListener('click', () => {
-          const key = sw.dataset.key;
-          Store.savePlugins({ [key]: !Store.plugins[key] });
-          this.applyPlugins();
-          this.renderSettingsPlugins(box);
-          this.toast(Store.plugins[key] ? this.t('plugins.enabled') : this.t('plugins.disabled'));
-        });
-      });
       box.querySelectorAll('.switch[data-cp-toggle]').forEach(sw => {
         sw.addEventListener('click', () => this.toggleCustomPlugin(sw.dataset.cpToggle));
       });
       box.querySelectorAll('[data-cp-del]').forEach(btn => {
         btn.addEventListener('click', () => this.deleteCustomPlugin(btn.dataset.cpDel));
       });
-      box.querySelectorAll('[data-pk-del]').forEach(btn => {
-        btn.addEventListener('click', () => this.deletePresetPlugin(btn.dataset.pkDel));
-      });
-      box.querySelectorAll('[data-pk-restore]').forEach(btn => {
-        btn.addEventListener('click', () => this.restorePresetPlugin(btn.dataset.pkRestore));
+      $('#officialMarketBtn').addEventListener('click', () => {
+        window.open(officialUrl, '_blank');
       });
       $('#dlDesign').addEventListener('click', () => this.downloadDesignFile());
       $('#copyDesign').addEventListener('click', () => this.copyDesignFile());
@@ -1167,7 +1152,7 @@
         </div>
         <div class="setting-row">
           <div><div class="sr-label">${this.esc(this.t('info.version'))}</div><div class="sr-desc">${this.esc(this.t('info.versionDesc'))}</div></div>
-          <div class="sr-control"><span style="color:var(--text-sub)">v0.15</span></div>
+          <div class="sr-control"><span style="color:var(--text-sub)">v0.16</span></div>
         </div>
         <div class="update-result" id="updateResult" style="display:none"></div>`;
       $('#checkUpdate').addEventListener('click', async () => {
@@ -1215,10 +1200,10 @@
         { key: 'lg', label: this.t('size.lg') }
       ];
       const quickSetOpts = [
-        { key: 'both', label: this.t('qs.both') },
-        { key: 'longpress', label: this.t('qs.longpress') },
-        { key: 'button', label: this.t('qs.button') },
-        { key: 'off', label: this.t('qs.off') }
+        { key: 'both', label: this.t('quickSet.both') },
+        { key: 'longpress', label: this.t('quickSet.longpress') },
+        { key: 'button', label: this.t('quickSet.button') },
+        { key: 'off', label: this.t('quickSet.off') }
       ];
       const bgTypes = [
         { key: 'none', label: this.t('bg.none') },
@@ -1236,13 +1221,29 @@
       };
       const langs = Object.keys(langNames).map(key => ({ key, label: langNames[key] }));
       const swatches = ['#F3F0E9', '#F7F7F5', '#EEF0E8', '#26241F', '#C25E4E', '#8A7A3F', '#5B8A72', '#4A6FA5'];
+      const selectOpts = (opts, value, dataAttr) => opts.map(o =>
+        `<option value="${o.key}" ${value === o.key ? 'selected' : ''}>${this.esc(o.label)}</option>`
+      ).join('');
+      const sliderRow = (dataAttr, value, label) => `
+        <div class="setting-row">
+          <div><div class="sr-label">${this.esc(label)}</div></div>
+          <div class="sr-control">
+            <div class="glass-slider-row">
+              <input type="range" class="glass-slider" min="0" max="100" value="${value}" data-${dataAttr}="${value}">
+              <span class="glass-value">${value}${this.esc(this.t('appearance.glassUnit'))}</span>
+            </div>
+          </div>
+        </div>`;
+
       box.innerHTML = `
         <h4>${this.esc(this.t('appearance.title'))}</h4>
         <p class="sc-desc">${this.esc(this.t('appearance.desc'))}</p>
         <div class="setting-row">
           <div><div class="sr-label">${this.esc(this.t('appearance.theme'))}</div></div>
-          <div class="sr-control theme-options">
-            ${themes.map(t => `<button class="theme-opt${s.theme === t.key ? ' active' : ''}" data-theme="${t.key}">${this.esc(t.label)}</button>`).join('')}
+          <div class="sr-control">
+            <select class="ctl-select" id="themeSelect">
+              ${selectOpts(themes, s.theme)}
+            </select>
           </div>
         </div>
         <div class="setting-row">
@@ -1259,8 +1260,10 @@
         </div>
         <div class="setting-row">
           <div><div class="sr-label">${this.esc(this.t('appearance.lang'))}</div><div class="sr-desc">${this.esc(this.t('appearance.langDesc'))}</div></div>
-          <div class="sr-control theme-options">
-            ${langs.map(t => `<button class="theme-opt${s.lang === t.key ? ' active' : ''}" data-lang="${t.key}">${this.esc(t.label)}</button>`).join('')}
+          <div class="sr-control">
+            <select class="ctl-select" id="langSelect">
+              ${selectOpts(langs, s.lang)}
+            </select>
           </div>
         </div>
         <div class="setting-row">
@@ -1273,7 +1276,7 @@
           <div><div class="sr-label">${this.esc(this.t('appearance.bgColor'))}</div></div>
           <div class="sr-control">
             <div class="bg-swatches">
-              ${swatches.map(c => `<button class="bg-swatch${s.bgColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" aria-label="${this.esc(this.t('appearance.bgAria', { c }))}"></button>`).join('')}
+              ${swatches.map(c => `<button class="bg-swatch${s.bgColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}
             </div>
             <input type="color" class="bg-color-input" id="bgColorInput" value="${this.esc(s.bgColor || '#F3F0E9')}">
           </div>
@@ -1288,8 +1291,10 @@
         </div>
         <div class="setting-row">
           <div><div class="sr-label">${this.esc(this.t('appearance.quickSet'))}</div><div class="sr-desc">${this.esc(this.t('appearance.quickSetDesc'))}</div></div>
-          <div class="sr-control theme-options">
-            ${quickSetOpts.map(o => `<button class="theme-opt${s.quickSet === o.key ? ' active' : ''}" data-quickset="${o.key}">${this.esc(o.label)}</button>`).join('')}
+          <div class="sr-control">
+            <select class="ctl-select" id="quickSetSelect">
+              ${selectOpts(quickSetOpts, s.quickSet)}
+            </select>
           </div>
         </div>
         <div class="setting-row">
@@ -1306,17 +1311,17 @@
             <button class="theme-opt${s.railNowStyle === 'dot' ? ' active' : ''}" data-now="dot">${this.esc(this.t('now.dot'))}</button>
           </div>
         </div>
-        <div class="setting-row">
-          <div><div class="sr-label">${this.esc(this.t('appearance.navGlass'))}</div><div class="sr-desc">${this.esc(this.t('appearance.navGlassDesc'))}</div></div>
-          <div class="sr-control"><button class="switch${s.navGlass !== false ? ' on' : ''}" id="navGlass" role="switch" aria-checked="${s.navGlass !== false}"></button></div>
-        </div>`;
+        <h5>${this.esc(this.t('appearance.glass'))}</h5>
+        <p class="sc-desc">${this.esc(this.t('appearance.glassDesc'))}</p>
+        ${sliderRow('navglass', s.navGlassOpacity, this.t('appearance.navGlassOpacity'))}
+        ${sliderRow('inputglass', s.inputGlassOpacity, this.t('appearance.inputGlassOpacity'))}
+        ${sliderRow('bgglass', s.bgOpacity, this.t('appearance.bgOpacity'))}`;
 
-      box.querySelectorAll('.theme-opt[data-theme]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          Store.saveSettings({ theme: btn.dataset.theme });
-          this.applySettings();
-          this.renderSettingsAppearance(box);
-        });
+      /* 主题下拉 */
+      $('#themeSelect').addEventListener('change', e => {
+        Store.saveSettings({ theme: e.target.value });
+        this.applySettings();
+        this.renderSettingsAppearance(box);
       });
       box.querySelectorAll('.theme-opt[data-size]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1333,15 +1338,14 @@
           this.renderSettingsAppearance(box);
         });
       });
-      box.querySelectorAll('.theme-opt[data-lang]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          Store.saveSettings({ lang: btn.dataset.lang });
-          this.applyLang();
-          this.renderSettingsCats('appearance');
-          this.renderSettingsAppearance(box);
-          this.renderNav();
-          if (this.state.view === 'home') this.renderHome();
-        });
+      /* 语言下拉 */
+      $('#langSelect').addEventListener('change', e => {
+        Store.saveSettings({ lang: e.target.value });
+        this.applyLang();
+        this.renderSettingsCats('appearance');
+        this.renderSettingsAppearance(box);
+        this.renderNav();
+        if (this.state.view === 'home') this.renderHome();
       });
       box.querySelectorAll('.theme-opt[data-bgtype]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1386,12 +1390,11 @@
         this.renderSettingsAppearance(box);
         this.toast(this.t('toast.bgCleared'));
       });
-      box.querySelectorAll('.theme-opt[data-quickset]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          Store.saveSettings({ quickSet: btn.dataset.quickset });
-          if (this.state.view === 'home') this.renderHome();
-          this.renderSettingsAppearance(box);
-        });
+      /* 快捷设置下拉 */
+      $('#quickSetSelect').addEventListener('change', e => {
+        Store.saveSettings({ quickSet: e.target.value });
+        if (this.state.view === 'home') this.renderHome();
+        this.renderSettingsAppearance(box);
       });
       box.querySelectorAll('.theme-opt[data-mark]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1409,11 +1412,21 @@
           this.renderSettingsAppearance(box);
         });
       });
-      $('#navGlass').addEventListener('click', () => {
-        Store.saveSettings({ navGlass: !(Store.settings.navGlass !== false) });
+      /* 毛玻璃滑块 */
+      box.querySelector('.glass-slider[data-navglass]').addEventListener('input', e => {
+        Store.saveSettings({ navGlassOpacity: Number(e.target.value) });
         this.applySettings();
-        this.renderSettingsAppearance(box);
-        this.toast(Store.settings.navGlass !== false ? this.t('toast.navGlassOn') : this.t('toast.navGlassOff'));
+        e.target.parentElement.querySelector('.glass-value').textContent = e.target.value + this.t('appearance.glassUnit');
+      });
+      box.querySelector('.glass-slider[data-inputglass]').addEventListener('input', e => {
+        Store.saveSettings({ inputGlassOpacity: Number(e.target.value) });
+        this.applySettings();
+        e.target.parentElement.querySelector('.glass-value').textContent = e.target.value + this.t('appearance.glassUnit');
+      });
+      box.querySelector('.glass-slider[data-bgglass]').addEventListener('input', e => {
+        Store.saveSettings({ bgOpacity: Number(e.target.value) });
+        this.applySettings();
+        e.target.parentElement.querySelector('.glass-value').textContent = e.target.value + this.t('appearance.glassUnit');
       });
     },
 
@@ -1502,10 +1515,6 @@
         <div class="setting-row" style="margin-top:20px">
           <div><div class="sr-label">${this.esc(this.t('data.clear'))}</div><div class="sr-desc">${this.esc(this.t('data.clearDesc'))}</div></div>
           <div class="sr-control"><button class="text-btn danger" id="clearData">${this.esc(this.t('data.clearBtn'))}</button></div>
-        </div>
-        <div class="setting-row">
-          <div><div class="sr-label">${this.esc(this.t('data.seed'))}</div><div class="sr-desc">${this.esc(this.t('data.seedDesc'))}</div></div>
-          <div class="sr-control"><button class="text-btn primary" id="seedData">${this.esc(this.t('data.restore'))}</button></div>
         </div>`;
 
       $('#exportBtn').addEventListener('click', () => this.exportData($('#exportFmt').value));
@@ -1515,11 +1524,6 @@
           this.refreshView();
           this.toast(this.t('data.cleared'));
         }
-      });
-      $('#seedData').addEventListener('click', () => {
-        Store.reseed();
-        this.refreshView();
-        this.toast(this.t('data.reseeded'));
       });
     },
 

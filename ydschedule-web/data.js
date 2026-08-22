@@ -15,29 +15,26 @@
   };
 
   const DEFAULT_SETTINGS = {
-    theme: 'paper',        // paper | white | ink | night
-    fontSize: 'md',        // sm | md | lg
-    lang: 'zh-CN',         // 界面语言：zh-CN | zh-TW | en | fr | ru | es | ar
-    inputSize: 'md',       // 首页输入框大小：sm | md | lg
-    onboarded: false,      // 是否已展示首次使用指引
-    cloudKey: '',          // 云端 AI 密钥（本地编码存储，界面隐藏明文）
-    cloudMode: false,      // 云端模式开关：开启后才调用云端 API，否则用本地解析
-    quickSet: 'longpress', // 主页快捷设置：both 长按+按钮 | longpress 仅长按 | button 仅按钮 | off 关闭（首次进入默认仅长按）
-    bgType: 'none',        // 背景：none 默认 | color 纯色 | image 图片
-    bgColor: '#F3F0E9',    // 纯色背景色值
-    railMarkColor: 'green',// 时间轴今日日程标点颜色：green | yellow
-    railNowStyle: 'bar',   // 当前时间指示样式：bar 横杠 | dot 圆点
-    navGlass: true,        // 侧边导航毛玻璃：true 开启 | false 关闭
-    updateUrl: 'https://brm-yidu.github.io/YDSchedule/updates/latest.json'  // 更新源：指向 latest.json 版本清单的 URL，留空则检查更新不可用
+    theme: 'paper',            // paper | white | ink | night
+    fontSize: 'md',            // sm | md | lg
+    lang: 'zh-CN',             // 界面语言：zh-CN | zh-TW | en | fr | ru | es | ar
+    inputSize: 'md',           // 首页输入框大小：sm | md | lg
+    onboarded: false,          // 是否已展示首次使用指引
+    cloudKey: '',              // 云端 AI 密钥（本地编码存储，界面隐藏明文）
+    cloudMode: false,          // 云端模式开关：开启后才调用云端 API，否则用本地解析
+    quickSet: 'longpress',     // 主页快捷设置：both | longpress | button | off
+    bgType: 'none',            // 背景：none 默认 | color 纯色 | image 图片
+    bgColor: '#F3F0E9',        // 纯色背景色值
+    railMarkColor: 'green',    // 时间轴今日日程标点颜色：green | yellow
+    railNowStyle: 'bar',       // 当前时间指示样式：bar 横杠 | dot 圆点
+    navGlassOpacity: 100,      // 侧边导航毛玻璃不透明度：0~100（100=不透明=无效果，0=完全透明）
+    inputGlassOpacity: 100,    // 首页输入框毛玻璃不透明度：0~100
+    bgOpacity: 100,            // 背景遮罩不透明度：0~100（控制背景图片/颜色的可见度）
+    updateUrl: 'https://brm-yidu.github.io/YDSchedule/updates/latest.json'
   };
 
-  const DEFAULT_PLUGINS = {
-    card: false,           // 样式包：卡片式
-    weather: false,        // 样式包：带天气栏
-    progress: false,       // 样式包：带进度条
-    fitness: false,        // 健身插件（扩展点击标签）
-    wechat: false          // 微信通知插件
-  };
+  /* 预设插件已移除 —— 改为官方插件市场（从官网动态获取） */
+  const DEFAULT_PLUGINS = {};
 
   /* ---------- 密钥本地编码（非明文存储，防直接查看） ---------- */
   function encodeKey(s) {
@@ -138,7 +135,6 @@
     settings: Object.assign({}, DEFAULT_SETTINGS),
     plugins: Object.assign({}, DEFAULT_PLUGINS),
     customPlugins: [],
-    removedPlugins: [],
 
     load() {
       try {
@@ -151,6 +147,14 @@
         const s = localStorage.getItem(KEYS.settings);
         this.settings = Object.assign({}, DEFAULT_SETTINGS, s ? JSON.parse(s) : {});
         this.settings.cloudKey = decodeKey(this.settings.cloudKey);
+        /* 旧版 navGlass 布尔值迁移到 navGlassOpacity */
+        if (typeof this.settings.navGlass === 'boolean') {
+          this.settings.navGlassOpacity = this.settings.navGlass ? 70 : 100;
+          delete this.settings.navGlass;
+        }
+        /* 确保新增设置有默认值（防止老用户数据缺字段） */
+        if (typeof this.settings.inputGlassOpacity === 'undefined') this.settings.inputGlassOpacity = 100;
+        if (typeof this.settings.bgOpacity === 'undefined') this.settings.bgOpacity = 100;
       } catch (err) {
         this.settings = Object.assign({}, DEFAULT_SETTINGS);
       }
@@ -166,14 +170,6 @@
       } catch (err) {
         this.customPlugins = [];
       }
-      try {
-        const r = localStorage.getItem(KEYS.removed);
-        this.removedPlugins = r ? JSON.parse(r) : [];
-      } catch (err) {
-        this.removedPlugins = [];
-      }
-      /* 已删除的预设插件不因默认值合并而复活 */
-      this.removedPlugins.forEach(k => delete this.plugins[k]);
       this.save();
     },
 
@@ -184,7 +180,6 @@
         localStorage.setItem(KEYS.settings, JSON.stringify(s));
         localStorage.setItem(KEYS.plugins, JSON.stringify(this.plugins));
         localStorage.setItem(KEYS.custom, JSON.stringify(this.customPlugins));
-        localStorage.setItem(KEYS.removed, JSON.stringify(this.removedPlugins));
       } catch (err) { /* 存储不可用时静默 */ }
     },
 
@@ -213,12 +208,6 @@
     clearAll() {
       this.events = [];
       this.save();
-    },
-
-    reseed() {
-      this.events = seedEvents();
-      this.save();
-      return this.events;
     },
 
     saveSettings(patch) {
@@ -261,26 +250,6 @@
     removeCustomPlugin(id) {
       this.customPlugins = this.customPlugins.filter(p => p.id !== id);
       this.save();
-    },
-
-    /* 预设插件：删除（记录到 removedPlugins）/ 恢复 */
-    removePresetPlugin(key) {
-      if (!(key in DEFAULT_PLUGINS)) return false;
-      if (!this.removedPlugins.includes(key)) this.removedPlugins.push(key);
-      delete this.plugins[key];
-      this.save();
-      return true;
-    },
-
-    restorePresetPlugin(key) {
-      this.removedPlugins = this.removedPlugins.filter(k => k !== key);
-      this.plugins[key] = false;
-      this.save();
-      return true;
-    },
-
-    isPluginRemoved(key) {
-      return this.removedPlugins.includes(key);
     },
 
     /* 某日期某小时是否有事件（含重复规则展开） */

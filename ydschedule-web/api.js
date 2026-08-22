@@ -67,11 +67,11 @@
 
     /* GET /api/update —— 检查更新
        从设置中的更新源（updateUrl）拉取 latest.json 版本清单，与当前版本比较。
-       latest.json 格式：{ "version": "v0.15", "url": "下载地址", "notes": "更新说明" }
+       latest.json 格式：{ "version": "v0.16", "url": "下载地址", "notes": "更新说明" }
        未配置更新源时提示不可用；拉取失败时给出明确错误。 */
     async checkUpdate() {
       const s = Store.settings;
-      const VERSION = 'v0.15';
+      const VERSION = 'v0.16';
       if (!s.updateUrl) {
         await delay(300);
         return { code: 0, data: { hasUpdate: false, version: VERSION, latest: VERSION, source: 'none' } };
