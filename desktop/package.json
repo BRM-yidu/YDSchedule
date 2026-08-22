@@ -1,9 +1,9 @@
 {
   "name": "ydschedule-desktop",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "极简日程表 YDSchedule 桌面端（Windows / macOS）",
   "main": "main.js",
-  "author": "YDSchedule",
+  "author": "YIDU",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
