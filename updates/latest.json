@@ -1,5 +1,5 @@
 {
-  "version": "v0.14",
-  "url": "https://github.com/BRM-yidu/YDSchedule/releases/download/v0.14.0/YDSchedule-0.14.0-setup.exe",
-  "notes": "新增云端模式、插件管理删除功能、导航栏毛玻璃等"
+  "version": "v0.15",
+  "url": "https://github.com/BRM-yidu/YDSchedule/releases/download/v0.15.0/YDSchedule-0.15.0-setup.exe",
+  "notes": "新增首次使用指引、多语言支持（繁中/英/法/俄/西/阿）、首页输入框大小调节、移动端适配优化等"
 }
