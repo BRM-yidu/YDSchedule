@@ -1,5 +1,5 @@
 /* YDSchedule Service Worker —— 离线缓存，移动端 PWA 可安装 */
-const CACHE = 'ydschedule-v0.14';
+const CACHE = 'ydschedule-v0.15';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './data.js',
   './parser.js',
   './api.js',
+  './locales.js',
   './plugin-design.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
