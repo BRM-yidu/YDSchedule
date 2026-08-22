@@ -1,5 +1,5 @@
 {
-  "version": "v0.15",
-  "url": "https://github.com/BRM-yidu/YDSchedule/releases/download/v0.15.0/YDSchedule-0.15.0-setup.exe",
-  "notes": "新增首次使用指引、多语言支持（繁中/英/法/俄/西/阿）、首页输入框大小调节、移动端适配优化等"
+  "version": "v0.16",
+  "url": "https://github.com/BRM-yidu/YDSchedule/releases/download/v0.16.0/YDSchedule-0.16.0-setup.exe",
+  "notes": "1. 新增毛玻璃效果及不透明度调节（输入框/侧边栏/背景独立控制）\n2. 设置按钮移至右下角并放大\n3. 移除侧边栏插件视图入口\n4. 设置页超过3个选项改用下拉菜单\n5. 删除预设插件，新增官方插件市场入口\n6. 移除恢复示例数据功能\n7. 作者信息更新为YIDU一度\n8. 重构移动端APK底层，修复背景图片选择\n9. UI整体优化，参考Apple设计风格"
 }
