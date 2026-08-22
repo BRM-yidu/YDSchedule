@@ -17,9 +17,12 @@
   const DEFAULT_SETTINGS = {
     theme: 'paper',        // paper | white | ink | night
     fontSize: 'md',        // sm | md | lg
+    lang: 'zh-CN',         // 界面语言：zh-CN | zh-TW | en | fr | ru | es | ar
+    inputSize: 'md',       // 首页输入框大小：sm | md | lg
+    onboarded: false,      // 是否已展示首次使用指引
     cloudKey: '',          // 云端 AI 密钥（本地编码存储，界面隐藏明文）
     cloudMode: false,      // 云端模式开关：开启后才调用云端 API，否则用本地解析
-    quickSet: 'both',      // 主页快捷设置：both 长按+按钮 | longpress 仅长按 | button 仅按钮 | off 关闭
+    quickSet: 'longpress', // 主页快捷设置：both 长按+按钮 | longpress 仅长按 | button 仅按钮 | off 关闭（首次进入默认仅长按）
     bgType: 'none',        // 背景：none 默认 | color 纯色 | image 图片
     bgColor: '#F3F0E9',    // 纯色背景色值
     railMarkColor: 'green',// 时间轴今日日程标点颜色：green | yellow
